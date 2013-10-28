@@ -524,6 +524,11 @@ bool RunLoop::Timer::operator==(const Timer& o) const
 {
     return (_fireDate == o._fireDate) && (_interval == o._interval) && (_fn.target<void>() == o._fn.target<void>());
 }
+//bjctw, compatible with clang@linux
+bool RunLoop::Timer::operator<(const Timer& o) const
+{
+    return _fireDate < o._fireDate;
+}
 void RunLoop::Timer::Cancel()
 {
     _cancelled = true;

@@ -27,6 +27,7 @@
 #include <string>
 #include <sstream>
 #include <cstdlib>
+#include <string.h>	//bjctw, compatible with clang@linux
 
 EPUB3_XML_BEGIN_NAMESPACE
 

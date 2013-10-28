@@ -322,6 +322,7 @@ public:
         bool            operator==(const Timer&) const;
         bool            operator!=(const Timer&o) const { return this->operator==(o) == false; }
         
+        bool            operator<(const Timer&) const;	//bjctw, compatible with clang@linux
         ///
         /// Cancels the timer, causing it to never fire again.
         EPUB3_EXPORT

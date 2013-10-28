@@ -66,6 +66,10 @@ typedef pthread_rwlock_t CRITICAL_SECTION;
 
 namespace logging {
 
+//bjctw, compatible with clang@linux
+# define strlcat(dst,src,sz) strncat(dst,src,sz)
+# define strlcpy(dst,src,sz) strncpy(dst,src,sz)
+
 const char* const log_severity_names[LOG_NUM_SEVERITIES] = {
   "INFO", "WARNING", "ERROR", "FATAL" };
 
@@ -182,7 +186,9 @@ bool InitializeLogFileHandle() {
 #elif EPUB_OS(ANDROID)
         strlcpy(log_file_name, GetProcessName().c_str(), MAX_PATH);
 #else
-        strlcpy(log_file_name, __progname, MAX_PATH);
+//bjctw, compatible with clang@linux
+        //strlcpy(log_file_name, __progname, MAX_PATH);
+        strlcpy(log_file_name, program_invocation_name, MAX_PATH);
 #endif
         char* last_slash = strrchr(log_file_name, '/');
         if ( last_slash != nullptr )

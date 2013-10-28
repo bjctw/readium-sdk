@@ -48,6 +48,10 @@
 # define strlcpy(dst,src,sz) strcpy_s(dst,sz,src)
 #endif
 
+//bjctw, compatible with clang@linux
+# define strlcat(dst,src,sz) strncat(dst,src,sz)
+# define strlcpy(dst,src,sz) strncpy(dst,src,sz)
+
 #if USING_ICU
 // the only pieces of ICU that we still need
 extern "C" int32_t

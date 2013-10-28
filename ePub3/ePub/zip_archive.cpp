@@ -25,6 +25,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <cstring>	//bjctw, compatible with clang@linux
 #if EPUB_OS(UNIX)
 #include <unistd.h>
 #endif
