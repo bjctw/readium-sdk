@@ -2,16 +2,16 @@ To build, run:
 CC=clang CXX=clang cmake ../..
 make
 
-[Built Enviornment]
+[Built Environment]
 Ubuntu 12.04
 cmake 2.4
 clang 3.4 (maybe a previous version works, but 3.0 did not work)
 libc++
 
 The 'include' directory is copied from Platform/Android.
-Some source files in ePub3/ is modified for the compatibilty of clang on Linux.
+Some source files in ePub3/ is modified for the compatibility of clang on Linux.
 Most files of ePub3/ThirdParty are not added into library, because they have equivalent Linux library.
 Not tested yet. (I am working on SDKLauncher-Linux)
 
-Contact me at bjc0509@gmail.com if you have any problem/suggestion.
+mailto:bjc0509@gmail.com if you have any problem/suggestion.
 
