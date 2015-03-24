@@ -3,21 +3,15 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-01-02.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
-//  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//
+//  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+//  1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+//  3. Neither the name of the organization nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+//
+
 
 #include "../ePub3/ePub/container.h"
 #include "../ePub3/ePub/package.h"
@@ -25,6 +19,7 @@
 #include "../ePub3/utilities/error_handler.h"
 #include "catch.hpp"
 #include <cstdlib>
+#include "../ePub3/xml/tree/document.h"
 
 #define EPUB_PATH "TestData/childrens-literature-20120722.epub"
 #define BINDINGS_EPUB_PATH "TestData/widget-figure-gallery-20121022.epub"
@@ -633,17 +628,16 @@ TEST_CASE("Package should have a Unique ID, Package ID, Type, Version, and a Bas
 TEST_CASE("Packages with no version should raise a spec error", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kInvalidVersion, (int)strlen(kInvalidVersion));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kInvalidVersion, (int)strlen(kInvalidVersion)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -653,17 +647,16 @@ TEST_CASE("Packages with no version should raise a spec error", "")
 TEST_CASE("Packages with no title metadata should raise a spec error", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kMissingTitle, (int)strlen(kMissingTitle));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kMissingTitle, (int)strlen(kMissingTitle)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -673,17 +666,16 @@ TEST_CASE("Packages with no title metadata should raise a spec error", "")
 TEST_CASE("Packages with no identifier should raise a spec error", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kMissingIdentifier, (int)strlen(kMissingIdentifier));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kMissingIdentifier, (int)strlen(kMissingIdentifier)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -693,17 +685,16 @@ TEST_CASE("Packages with no identifier should raise a spec error", "")
 TEST_CASE("Packages with no language metadata should raise a spec error", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kMissingLanguage, (int)strlen(kMissingLanguage));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kMissingLanguage, (int)strlen(kMissingLanguage)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -713,17 +704,16 @@ TEST_CASE("Packages with no language metadata should raise a spec error", "")
 TEST_CASE("Packages with no midification date should raise a spec error", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kMissingModDate, (int)strlen(kMissingModDate));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kMissingModDate, (int)strlen(kMissingModDate)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -733,17 +723,16 @@ TEST_CASE("Packages with no midification date should raise a spec error", "")
 TEST_CASE("Packages with an invalid unique-id reference should raise a spec error", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kInvalidUniqueIDRef, (int)strlen(kInvalidUniqueIDRef));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kInvalidUniqueIDRef, (int)strlen(kInvalidUniqueIDRef)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -753,17 +742,16 @@ TEST_CASE("Packages with an invalid unique-id reference should raise a spec erro
 TEST_CASE("'refines' should contain a valid IRI", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kInvalidRefinementIRI, (int)strlen(kInvalidRefinementIRI));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kInvalidRefinementIRI, (int)strlen(kInvalidRefinementIRI)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -773,17 +761,16 @@ TEST_CASE("'refines' should contain a valid IRI", "")
 TEST_CASE("'refine' should contain a relative IRI", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kAbsoluteRefinementIRI, (int)strlen(kAbsoluteRefinementIRI));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kAbsoluteRefinementIRI, (int)strlen(kAbsoluteRefinementIRI)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -793,17 +780,16 @@ TEST_CASE("'refine' should contain a relative IRI", "")
 TEST_CASE("'refine' IRI should reference an existing item", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kInvalidRefinement, (int)strlen(kInvalidRefinement));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kInvalidRefinement, (int)strlen(kInvalidRefinement)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -813,17 +799,16 @@ TEST_CASE("'refine' IRI should reference an existing item", "")
 TEST_CASE("Spine 'idref' should reference an existing manifest item", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kInvalidSpineIDRef, (int)strlen(kInvalidSpineIDRef));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kInvalidSpineIDRef, (int)strlen(kInvalidSpineIDRef)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -833,17 +818,16 @@ TEST_CASE("Spine 'idref' should reference an existing manifest item", "")
 TEST_CASE("Should raise an error if the Metadata is out of place", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kMetadataOutOfPlace, (int)strlen(kMetadataOutOfPlace));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kMetadataOutOfPlace, (int)strlen(kMetadataOutOfPlace)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -853,17 +837,16 @@ TEST_CASE("Should raise an error if the Metadata is out of place", "")
 TEST_CASE("Should raise an error if the Manifest is out of place", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kManifestOutOfPlace, (int)strlen(kManifestOutOfPlace));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kManifestOutOfPlace, (int)strlen(kManifestOutOfPlace)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -873,17 +856,16 @@ TEST_CASE("Should raise an error if the Manifest is out of place", "")
 TEST_CASE("Should raise an error if the spine is out of place", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kSpineOutOfPlace, (int)strlen(kSpineOutOfPlace));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kSpineOutOfPlace, (int)strlen(kSpineOutOfPlace)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -893,17 +875,16 @@ TEST_CASE("Should raise an error if the spine is out of place", "")
 TEST_CASE("Should raise an error if a spine item doesn't reference a content item", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kNoContentDocInSpine, (int)strlen(kNoContentDocInSpine));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kNoContentDocInSpine, (int)strlen(kNoContentDocInSpine)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -913,17 +894,16 @@ TEST_CASE("Should raise an error if a spine item doesn't reference a content ite
 TEST_CASE("Should be happy of a spine item only references a content item via the fallback chain", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kContentDocInFallback, (int)strlen(kContentDocInFallback));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kContentDocInFallback, (int)strlen(kContentDocInFallback)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -933,17 +913,16 @@ TEST_CASE("Should be happy of a spine item only references a content item via th
 TEST_CASE("Should raise an error if a fallback chain contains circular references", "")
 {
     EPUBError triggeredError = EPUBError::NoError;
-    SetErrorHandler([&](const std::runtime_error& err){
-        const epub_spec_error* epubErr = dynamic_cast<const epub_spec_error*>(&err);
-        if ( epubErr != nullptr )
-            triggeredError = static_cast<EPUBError>(epubErr->code().value());
+    SetErrorHandler([&](const error_details& err){
+        if (err.is_spec_error())
+            triggeredError = err.epub_error_code();
         return true;
     });
     
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
-    PackagePtr pkg = std::make_shared<Package>(c, "application/oebps-package+xml");
+    PackagePtr pkg = Package::New(c, "application/oebps-package+xml");
     
-    xmlDocPtr doc = xmlParseMemory(kCircularFallbackChain, (int)strlen(kCircularFallbackChain));
+    auto doc = ePub3::xml::Wrapped<ePub3::xml::Document>(xmlParseMemory(kCircularFallbackChain, (int)strlen(kCircularFallbackChain)));
     pkg->_OpenForTest(doc, "EPUB/");
     
     SetErrorHandler(DefaultErrorHandler);
@@ -1004,14 +983,16 @@ TEST_CASE("Package should be able to create and resolve basic CFIs", "")
 {
     ContainerPtr c = Container::OpenContainer(EPUB_PATH);
     PackagePtr pkg = c->DefaultPackage();
-    size_t spineIdx = arc4random() % pkg->FirstSpineItem()->Count();
+    
+    uint32_t numSpineItems = static_cast<uint32_t>(pkg->FirstSpineItem()->Count());
+    size_t spineIdx = arc4random_uniform(numSpineItems);
     auto spineItem = pkg->SpineItemAt(spineIdx);
     
     // create a mutable CFI
     CFI cfi(pkg->CFIForSpineItem(spineItem));
     REQUIRE_FALSE(cfi.Empty());
     
-    std::string str(_Str("/", pkg->SpineCFIIndex(), "/", spineIdx*2, "[", spineItem->Idref(), "]!"));
+    std::string str(_Str("/", pkg->SpineCFIIndex(), "/", (spineIdx+1)*2, "[", spineItem->Idref(), "]!"));
     REQUIRE(cfi.String() == _Str("epubcfi(", str, ")"));
     REQUIRE(cfi == _Str("epubcfi(", str, ")"));
     

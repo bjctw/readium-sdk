@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-04-08.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Common pieces used by all platforms
 #include "run_loop_common.ipp"
@@ -31,6 +30,8 @@
 #endif
 
 #include <android/looper.h>
+#include <unistd.h>
+#include <stdio.h>
 
 enum
 {
@@ -72,11 +73,11 @@ RunLoop::~RunLoop()
 }
 void RunLoop::PerformFunction(std::function<void ()> fn)
 {
-    RefCounted<EventSource> ev(new EventSource([fn](EventSource& __e){fn();}), adopt_ref);
+    shared_ptr<EventSource> ev(new EventSource([fn](EventSource& __e){fn();}));
     AddEventSource(ev);
     ev->Signal();
 }
-void RunLoop::AddTimer(Timer* timer)
+void RunLoop::AddTimer(TimerPtr timer)
 {
     StackLock lock(_listLock);
     if ( ContainsTimer(timer) )
@@ -85,12 +86,12 @@ void RunLoop::AddTimer(Timer* timer)
     _handlers[timer->_pipeFDs[0]] = timer;
     ALooper_addFd(_looper, timer->_pipeFDs[0], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, &RunLoop::_ReceiveLoopEvent, reinterpret_cast<void*>(this));
 }
-bool RunLoop::ContainsTimer(Timer* timer) const
+bool RunLoop::ContainsTimer(TimerPtr timer) const
 {
     StackLock lock(const_cast<RunLoop*>(this)->_listLock);
     return (_handlers.find(timer->_pipeFDs[0]) != _handlers.end());
 }
-void RunLoop::RemoveTimer(Timer* timer)
+void RunLoop::RemoveTimer(TimerPtr timer)
 {
     StackLock lock(_listLock);
     auto found = _handlers.find(timer->_pipeFDs[0]);
@@ -100,7 +101,7 @@ void RunLoop::RemoveTimer(Timer* timer)
         _handlers.erase(found);
     }
 }
-void RunLoop::AddObserver(Observer* observer)
+void RunLoop::AddObserver(ObserverPtr observer)
 {
     StackLock lock(_listLock);
     if ( ContainsObserver(observer) )
@@ -109,17 +110,17 @@ void RunLoop::AddObserver(Observer* observer)
     _observers.push_back(observer);
     _observerMask |= observer->_acts;
 }
-bool RunLoop::ContainsObserver(Observer* obs) const
+bool RunLoop::ContainsObserver(ObserverPtr obs) const
 {
     StackLock lock(const_cast<RunLoop*>(this)->_listLock);
-    for ( const Observer* o : _observers )
+    for ( const ObserverPtr o : _observers )
     {
         if ( obs == o )
             return true;
     }
     return false;
 }
-void RunLoop::RemoveObserver(Observer* obs)
+void RunLoop::RemoveObserver(ObserverPtr obs)
 {
     StackLock lock(_listLock);
     for ( auto iter = _observers.begin(), end = _observers.end(); iter != end; ++iter )
@@ -131,7 +132,7 @@ void RunLoop::RemoveObserver(Observer* obs)
         }
     }
 }
-void RunLoop::AddEventSource(EventSource* ev)
+void RunLoop::AddEventSource(EventSourcePtr ev)
 {
     StackLock lock(_listLock);
     if ( ContainsEventSource(ev) )
@@ -140,12 +141,12 @@ void RunLoop::AddEventSource(EventSource* ev)
     _handlers[ev->_evt[0]] = ev;
     ALooper_addFd(_looper, ev->_evt[0], ALOOPER_POLL_CALLBACK, ALOOPER_EVENT_INPUT, &_ReceiveLoopEvent, reinterpret_cast<void*>(this));
 }
-bool RunLoop::ContainsEventSource(EventSource* ev) const
+bool RunLoop::ContainsEventSource(EventSourcePtr ev) const
 {
     StackLock lock(const_cast<RunLoop*>(this)->_listLock);
     return (_handlers.find(ev->_evt[0]) != _handlers.end());
 }
-void RunLoop::RemoveEventSource(EventSource* ev)
+void RunLoop::RemoveEventSource(EventSourcePtr ev)
 {
     StackLock lock(_listLock);
     auto found = _handlers.find(ev->_evt[0]);
@@ -192,6 +193,12 @@ RunLoop::ExitReason RunLoop::RunInternal(bool returnAfterSourceHandled, std::chr
 
     do
     {
+        if ( _handlers.empty() )
+        {
+            reason = ExitReason::RunFinished;
+            break;
+        }
+        
         RunObservers(Observer::ActivityFlags::RunLoopBeforeWaiting);
         _listLock.unlock();
         _waiting = true;
@@ -239,7 +246,7 @@ void RunLoop::RunObservers(Observer::Activity activity)
     if ( (_observerMask & activity) == 0 )
         return;
     
-    std::vector<Observer*> observersToRemove;
+    shared_vector<Observer> observersToRemove;
     for ( auto observer : _observers )
     {
         if ( observer->IsCancelled() )
@@ -275,25 +282,23 @@ int RunLoop::_ReceiveLoopEvent(int fd, int events, void* data)
     ::read(fd, buf, 12);
     
     // what type is it?
-    Timer* pTimer = (Timer*)(iter->second);
+    TimerPtr pTimer = std::dynamic_pointer_cast<Timer>(iter->second);
     if (pTimer != nullptr)
     {
         // it's a Timer!
-        // keep the timer around past any Cancel() or Remove() calls made by the callout
-        RefCounted<Timer> timer(pTimer);
         if ( (events & ALOOPER_EVENT_HANGUP) == ALOOPER_EVENT_HANGUP )
         {
             // remove it from the runloop
-            p->RemoveTimer(timer);
+            p->RemoveTimer(pTimer);
             return 0;
         }
         
-        timer->_fn(*timer);                 ///////// DO CALLOUT
+        pTimer->_fn(*pTimer);                 ///////// DO CALLOUT
         
-        if ( !timer->Repeats() || timer->IsCancelled() )
+        if ( !pTimer->Repeats() || pTimer->IsCancelled() )
         {
             // the underlying Linux timer_t is already disarmed
-            p->RemoveTimer(timer);
+            p->RemoveTimer(pTimer);
             return 0;
         }
         
@@ -302,25 +307,23 @@ int RunLoop::_ReceiveLoopEvent(int fd, int events, void* data)
     }
     
     // not a Timer? Must be an EventSource then
-    EventSource *pSource = (EventSource*)(iter->second);
+    EventSourcePtr pSource = std::dynamic_pointer_cast<EventSource>(iter->second);
     if ( pSource != nullptr )
     {
         // it *is* an EventSource!
-        // keep it around so we can check even if the callout removes it from the runloop
-        RefCounted<EventSource> source(pSource);
         if ( (events & ALOOPER_EVENT_HANGUP) == ALOOPER_EVENT_HANGUP )
         {
             // calcelled, so remove it from the runloop
-            p->RemoveEventSource(source);
+            p->RemoveEventSource(pSource);
             return 0;
         }
         
-        source->_fn(*source);               /////////// DO CALLOUT
+        pSource->_fn(*pSource);               /////////// DO CALLOUT
         
-        if ( source->IsCancelled() )
+        if ( pSource->IsCancelled() )
         {
             // now we want to remove it
-            p->RemoveEventSource(source);
+            p->RemoveEventSource(pSource);
             return 0;
         }
         

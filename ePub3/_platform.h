@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-04-08.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef ePub3__platform_h
 #define ePub3__platform_h
@@ -466,7 +465,11 @@
 #elif EPUB_OS(DARWIN)
 #define EPUB_PLATFORM_MAC 1
 #elif EPUB_OS(WINDOWS)
+#if __cplusplus_winrt
+#define EPUB_PLATFORM_WINRT 1
+#else
 #define EPUB_PLATFORM_WIN 1
+#endif
 #elif EPUB_OS(ANDROID)
 #define EPUB_PLATFORM_ANDROID 1
 #endif
@@ -530,11 +533,11 @@
 #define EPUB_USE_CFNETWORK 1
 #endif /* PLATFORM(IOS) */
 
-#if EPUB_PLATFORM(WIN)
+#if EPUB_PLATFORM(WIN) || EPUB_PLATFORM(WINRT)
 #define EPUB_USE_CF 0
 #endif
 
-#if EPUB_PLATFORM(WIN)
+#if EPUB_PLATFORM(WIN) || EPUB_PLATFORM(WINRT)
 #define EPUB_USE_CFNETWORK 0
 #endif
 
@@ -543,7 +546,7 @@
 #endif
 
 #if !defined(EPUB_HAVE_ACCESSIBILITY)
-#if EPUB_PLATFORM(IOS) || EPUB_PLATFORM(MAC) || EPUB_PLATFORM(WIN)
+#if EPUB_PLATFORM(IOS) || EPUB_PLATFORM(MAC) || EPUB_PLATFORM(WIN) || EPUB_PLATFORM(WINRT)
 #define EPUB_HAVE_ACCESSIBILITY 1
 #endif
 #endif /* !defined(EPUB_HAVE_ACCESSIBILITY) */
@@ -634,6 +637,10 @@
 #if EPUB_OS(QNX)
 #define EPUB_HAVE_MADV_FREE_REUSE 1
 #define EPUB_HAVE_MADV_FREE 1
+#endif
+
+#if EPUB_PLATFORM(WINRT)
+#define EPUB_HAVE_CXX_FILESYSTEM 1
 #endif
 
 /* WTF original does all the ENABLE_[FEATURE] bits here */

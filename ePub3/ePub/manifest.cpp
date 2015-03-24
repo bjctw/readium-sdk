@@ -3,25 +3,25 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-29.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "manifest.h"
 #include "package.h"
 #include "byte_stream.h"
+#include "container.h"
 #include REGEX_INCLUDE
 #include <sstream>
 
@@ -76,16 +76,22 @@ ItemProperties& ItemProperties::operator=(const string& attrStr)
     string lowAttrs = attrStr.tolower();
     
     // NB: this is a C++11 raw-string literal. R"" means 'raw string', and the X(...)X bit are delimiters.
-    REGEX_NS::regex re("\\w+", REGEX_NS::regex::icase);
+	REGEX_NS::regex re("\\w+(-\\w+)?", REGEX_NS::regex::icase);
     auto pos = REGEX_NS::sregex_iterator(lowAttrs.stl_str().begin(), lowAttrs.stl_str().end(), re);
     auto end = REGEX_NS::sregex_iterator();
-    
+
     for ( ; pos != end; pos++ )
     {
         // using the entire matched range
         auto found = PropertyLookupTable.find(pos->str());
         if ( found != PropertyLookupTable.end() )
+        {
             _p |= found->second;
+        }
+        else
+        {
+            printf("Property not found: %s (from %s)\n", pos->str().c_str(), attrStr.c_str());
+        }
     }
     
     return *this;
@@ -155,7 +161,7 @@ ManifestItem::ManifestItem(ManifestItem&& o) : OwnedBy(std::move(o)), PropertyHo
 ManifestItem::~ManifestItem()
 {
 }
-bool ManifestItem::ParseXML(ManifestItemPtr& sharedMe, xmlNodePtr node)
+bool ManifestItem::ParseXML(shared_ptr<xml::Node> node)
 {
     SetXMLIdentifier(_getProp(node, "id"));
     if ( XMLIdentifier().empty() )
@@ -166,7 +172,7 @@ bool ManifestItem::ParseXML(ManifestItemPtr& sharedMe, xmlNodePtr node)
         return false;
     
     _mediaType = _getProp(node, "media-type");
-    if ( _href.empty() )
+    if ( _mediaType.empty() )
         return false;
     
     _mediaOverlayID = _getProp(node, "media-overlay");
@@ -176,7 +182,7 @@ bool ManifestItem::ParseXML(ManifestItemPtr& sharedMe, xmlNodePtr node)
 }
 string ManifestItem::AbsolutePath() const
 {
-    return _Str(this->Owner()->BasePath(), BaseHref());
+    return _Str(GetPackage()->BasePath(), BaseHref());
 }
 shared_ptr<ManifestItem> ManifestItem::MediaOverlay() const
 {
@@ -214,7 +220,21 @@ bool ManifestItem::HasProperty(const std::vector<IRI>& properties) const
     }
     return false;
 }
-xmlDocPtr ManifestItem::ReferencedDocument() const
+EncryptionInfoPtr ManifestItem::GetEncryptionInfo() const
+{
+    ContainerPtr container = GetPackage()->GetContainer();
+    string abs = AbsolutePath();
+    if (abs.at(0) == '/')
+    {
+        abs = abs.substr(1, abs.length()-1);
+    }
+    return container->EncryptionInfoForPath(abs);
+}
+bool ManifestItem::CanLoadDocument() const
+{
+	return GetPackage()->GetContainer()->FileExistsAtPath(AbsolutePath());
+}
+shared_ptr<xml::Document> ManifestItem::ReferencedDocument() const
 {
     // TODO: handle remote URLs
     string path(BaseHref());
@@ -226,22 +246,52 @@ xmlDocPtr ManifestItem::ReferencedDocument() const
     unique_ptr<ArchiveXmlReader> reader = package->XmlReaderForRelativePath(path);
     if ( !reader )
         return nullptr;
-    
-    xmlDocPtr result = nullptr;
+
+    // In some EPUBs, UTF-8 XML/HTML files have a superfluous (erroneous?) BOM, so we either:
+    // pass "utf-8" and expect InputBuffer::read_cb (in io.cpp) to skip the 3 erroneous bytes
+    // (otherwise the XML parser fails),
+    // or we pass NULL (in which case the parser auto-detects encoding)
+    const char * encoding = nullptr;
+    //const char * encoding = "utf-8";
+
+    shared_ptr<xml::Document> result(nullptr);
+#if EPUB_USE(LIBXML2)
     int flags = XML_PARSE_RECOVER|XML_PARSE_NOENT|XML_PARSE_DTDATTR;
     if ( _mediaType == "text/html" )
-        result = reader->htmlReadDocument(path.c_str(), "utf-8", flags);
+        result = reader->htmlReadDocument(path.c_str(), encoding, flags);
     else
-        result = reader->xmlReadDocument(path.c_str(), "utf-8", flags);
-    
+        result = reader->xmlReadDocument(path.c_str(), encoding, flags);
+#elif EPUB_USE(WIN_XML)
+	result = reader->ReadDocument(path.c_str(), "utf-8", 0);
+#endif
     return result;
 }
 unique_ptr<ByteStream> ManifestItem::Reader() const
 {
-    auto package = this->Owner();
+    auto package = GetPackage();
     if ( !package )
         return nullptr;
-    return package->ReadStreamForRelativePath(BaseHref());
+    
+    auto container = package->GetContainer();
+    if ( !container )
+        return nullptr;
+    
+    return container->GetArchive()->ByteStreamAtPath(AbsolutePath());
 }
+
+#ifdef SUPPORT_ASYNC
+unique_ptr<AsyncByteStream> ManifestItem::AsyncReader() const
+{
+    auto package = GetPackage();
+    if ( !package )
+        return nullptr;
+    
+    auto container = package->GetContainer();
+    if ( !container )
+        return nullptr;
+    
+    return container->GetArchive()->AsyncByteStreamAtPath(AbsolutePath());
+}
+#endif /* SUPPORT_ASYNC */
 
 EPUB3_END_NAMESPACE

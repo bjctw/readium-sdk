@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-01-30.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__content_handler__
 #define __ePub3__content_handler__
@@ -56,7 +55,10 @@ class Package;
  @ingroup media-handlers
  @see operator()(const string&, const ParameterList&)
  */
-class ContentHandler : public std::enable_shared_from_this<ContentHandler>, public OwnedBy<Package>
+class ContentHandler : public PointerType<ContentHandler>, public OwnedBy<Package>
+#if EPUB_PLATFORM(WINRT)
+	, public NativeBridge
+#endif
 {
 public:
     ///
@@ -77,26 +79,23 @@ public:
                             ContentHandler(shared_ptr<Package>& owner, const string& mediaType) : OwnedBy(owner), _mediaType(mediaType) {}
     ///
     /// Copy constructor.
-                            ContentHandler(const ContentHandler& o) : OwnedBy(o), _mediaType(o._mediaType), _owner(o._owner) {}
+                            ContentHandler(const ContentHandler& o) : OwnedBy(o), _mediaType(o._mediaType) {}
     ///
     /// Move constructor.
-    ContentHandler(ContentHandler&& o) : OwnedBy(std::move(o)), _mediaType(std::move(o._mediaType)), _owner(o._owner) { o._owner = nullptr; }
+    ContentHandler(ContentHandler&& o) : OwnedBy(std::move(o)), _mediaType(std::move(o._mediaType)) {}
     virtual                 ~ContentHandler() {}
     
     virtual ContentHandler& operator=(const ContentHandler& o) {
         _mediaType = o._mediaType;
-        _owner = o._owner;
+		OwnedBy::operator=(o);
         return *this;
     }
     virtual ContentHandler& operator=(ContentHandler&& o) {
         _mediaType = std::move(o._mediaType);
-        _owner = o._owner; o._owner = nullptr;
+		OwnedBy::operator=(std::move(o));
         return *this;
     }
     
-    ///
-    /// Obtains the Package to which this handler applies.
-    virtual const Package*  Owner()         const   { return _owner; }
     ///
     /// Obtains the media-type this object handles.
     virtual const string&   MediaType()     const   { return _mediaType; }
@@ -110,7 +109,6 @@ public:
                                        const ParameterList& parameters = ParameterList())   const   = 0;
     
 protected:
-    const Package*          _owner;         ///< The Package to which this handler applies.
     string                  _mediaType;     ///< The resource media-type that this object handles.
 };
 
@@ -184,7 +182,7 @@ public:
      @param src The Package-relative path to a resource.
      @param pkg The Package containing the resource.
      */
-    typedef std::function<void(const string& src, const Package* pkg)>  RendererImpl;
+    typedef std::function<void(const string& src, ConstPackagePtr pkg)>  RendererImpl;
 
 private:
     ///

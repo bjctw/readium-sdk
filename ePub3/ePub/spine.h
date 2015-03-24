@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-29.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__spine__
 #define __ePub3__spine__
@@ -27,16 +26,9 @@
 #include <ePub3/utilities/xml_identifiable.h>
 #include <ePub3/property_holder.h>
 #include <vector>
-#include <libxml/tree.h>
+#include <ePub3/xml/node.h>
 
 EPUB3_BEGIN_NAMESPACE
-
-class ManifestItem;
-class Package;
-class SpineItem;
-class IRI;
-
-typedef shared_ptr<SpineItem>   SpineItemPtr;
 
 /**
  The SpineItem class provides access to the spine of a publication.
@@ -79,7 +71,10 @@ typedef shared_ptr<SpineItem>   SpineItemPtr;
  
  @ingroup epub-model
  */
-class SpineItem : public std::enable_shared_from_this<SpineItem>, public OwnedBy<Package>, public PropertyHolder, public XMLIdentifiable
+class SpineItem : public PointerType<SpineItem>, public OwnedBy<Package>, public PropertyHolder, public XMLIdentifiable
+#if EPUB_PLATFORM(WINRT)
+	, public NativeBridge
+#endif
 {
 public:
     typedef std::vector<IRI>        PropertyList;
@@ -110,8 +105,11 @@ public:
     // It will also reach back into _prev and nullify its _next
     virtual             ~SpineItem();
     
+    FORCE_INLINE
+    PackagePtr          GetPackage()        const       { return Owner(); }
+    
     EPUB3_EXPORT
-    bool                ParseXML(shared_ptr<SpineItem>& sharedMe, xmlNodePtr node);
+    bool                ParseXML(shared_ptr<xml::Node> node);
     
     /// @{
     /// @name Metadata
@@ -140,6 +138,12 @@ public:
     /// Determine the spread location for this item (or for the first page thereof).
     EPUB3_EXPORT
     PageSpread          Spread()            const;
+
+	///
+	/// The title for this spine item, as defined in the TOC.
+	EPUB3_EXPORT
+	const string&		Title()				const		{ return _toc_title; }
+	void				SetTitle(const string& str)		{ _toc_title = str; }
     
     /// @}
     
@@ -197,6 +201,8 @@ public:
 protected:
     string                  _idref;             ///< The `idref` value targetting a ManifestItem.
     bool                    _linear;            ///< `true` if the item is linear (the default).
+	
+	string					_toc_title;
     
     weak_ptr<SpineItem>     _prev;              ///< The SpineItem preceding this one in the spine.
     shared_ptr<SpineItem>   _next;              ///< The SpineItem following this one in the spine.

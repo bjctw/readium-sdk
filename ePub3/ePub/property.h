@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-05-03.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__property__
 #define __ePub3__property__
@@ -30,7 +29,7 @@
 #include <ePub3/property_extension.h>
 #include <ePub3/utilities/epub_locale.h>
 #include <ePub3/utilities/xml_identifiable.h>
-#include <libxml/tree.h>
+#include <ePub3/xml/node.h>
 #include <vector>
 #include <map>
 
@@ -121,8 +120,13 @@ EPUB3_EXPORT
 DCType          DCTypeFromIRI(const IRI& iri);
     
 __private_extern__ string __lang_from_locale(const std::locale& loc);
+#if EPUB_USE(LIBXML2)
 __private_extern__ const xmlChar * DCMES_uri;
 __private_extern__ const xmlChar * MetaTagName;
+#else
+__private_extern__ const TCHAR * DCMES_uri;
+__private_extern__ const TCHAR * MetaTagName;
+#endif
 
 /**
  This exception is thrown when a property vocabulary prefix is unknown to a
@@ -140,7 +144,10 @@ public:
     virtual     ~UnknownPrefix()                     _NOEXCEPT                                      {}
 };
 
-class Property : public std::enable_shared_from_this<Property>, public OwnedBy<PropertyHolder>, public XMLIdentifiable
+class Property : public PointerType<Property>, public OwnedBy<PropertyHolder>, public XMLIdentifiable
+#if EPUB_PLATFORM(WINRT)
+	, public NativeBridge
+#endif
 {
 public:
     ///
@@ -163,7 +170,7 @@ public:
     virtual                 ~Property() {}
     
     EPUB3_EXPORT
-    bool                    ParseMetaElement(xmlNodePtr node);
+    bool                    ParseMetaElement(shared_ptr<xml::Node> node);
     
     
     /// @{

@@ -3,25 +3,30 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-22.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "utfstring.h"
+#include "integer_sequence.h"
 #include <locale>
-//#include <codecvt>
+
+#if EPUB_PLATFORM(WINRT)
+// need a converter from UTF-8 to Windows' wchar_t
+#include <codecvt>
+using WinRTCharConverter = std::wstring_convert<std::codecvt_utf8<wchar_t>>;
+#endif
 
 EPUB3_BEGIN_NAMESPACE
 
@@ -78,11 +83,30 @@ string::string(size_type n, wchar_t c)
     if ( n != 0 )
         _base.append(_Convert<wchar_t>::toUTF8(c, n));
 }
+string::string(const std::wstring& s)
+{
+	_base.append(_Convert<wchar_t>::toUTF8(s));
+}
+#if EPUB_USE(WIN_XML)
+string::string(const xml::string& s)
+{
+	_base.append(_Convert<wchar_t>::toUTF8(s));
+}
+#endif
 string::string(const __base & s, size_type i, size_type n)
 {
     // ensure we're looking at a valid location in the base string (not in the middle of a multi-byte character)j
     throw_unless_insertable(s, i, n);
     _base.assign(s, i, n);
+}
+string::string(const u16string_view& view) : _base(_Convert<char16_t>::toUTF8(view.data(), 0, view.size()))
+{
+}
+string::string(const u32string_view& view) : _base(_Convert<char32_t>::toUTF8(view.data(), 0, view.size()))
+{
+}
+string::string(const wstring_view& view) : _base(_Convert<wchar_t>::toUTF8(view.data(), 0, view.size()))
+{
 }
 template <>
 string::string(iterator first, iterator last) : _base(first.base(), last.base())
@@ -102,6 +126,8 @@ string::string(const xmlChar * pos, const xmlChar * end) : _base(reinterpret_cas
 }
 string::size_type string::size() const _NOEXCEPT
 {
+    // note that ePub3::string .utf8_size() actually returns _base.size() (from std::string)
+    // but that ePub3::string .size() does not necessarily return the same as std::string .size() !
     return to_utf32_size(_base.size());
 }
 void string::resize(size_type n, value_type c)
@@ -157,6 +183,13 @@ void string::resize(size_type n)
         _base.resize(newByteSize);
     }
 }
+#if 0//EPUB_PLATFORM(WINRT)
+::Platform::String^ string::winrt_str() const
+{
+	auto wstr = WinRTCharConverter().from_bytes(_base);
+	return ref new ::Platform::String(wstr.data(), wstr.length());
+}
+#endif
 const string::value_type string::at(size_type pos) const
 {
     return const_cast<string*>(this)->at(pos);
@@ -846,10 +879,14 @@ std::u16string string::utf16string() const
 {
     return _Convert<char16_t>::fromUTF8(_base);
 }
+std::wstring string::wchar_string() const
+{
+	return _Convert<wchar_t>::fromUTF8(_base);
+}
 string& string::tolower(const std::locale& loc)
 {
     auto& facet = std::use_facet<std::ctype<char>>(loc);
-    facet.tolower(&(*_base.begin()), &(*_base.end()));
+    facet.tolower(const_cast<char*>(_base.data()), const_cast<char*>(_base.data()) + _base.size());
     return *this;
 }
 const string string::tolower(const std::locale& loc) const
@@ -859,7 +896,7 @@ const string string::tolower(const std::locale& loc) const
 string& string::toupper(const std::locale& loc)
 {
     auto& facet = std::use_facet<std::ctype<char>>(loc);
-    facet.toupper(&(*_base.begin()), &(*_base.end()));
+	facet.toupper(const_cast<char*>(_base.data()), const_cast<char*>(_base.data()) + _base.size());
     return *this;
 }
 const string string::toupper(const std::locale& loc) const

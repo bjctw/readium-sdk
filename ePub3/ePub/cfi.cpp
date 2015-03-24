@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-12-10.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "cfi.h"
 #include <ePub3/utilities/error_handler.h>
@@ -25,13 +24,29 @@
 
 EPUB3_BEGIN_NAMESPACE
 
-CFI::CFI(const CFI& base, const CFI& start, const CFI& end) : _components(base._components), _rangeStart(start._components), _rangeEnd(end._components), _options(RangeTriplet)
+CFI::CFI(const CFI& base, const CFI& start, const CFI& end) :
+#if EPUB_PLATFORM(WINRT)
+NativeBridge(),
+#endif
+_components(base._components), _rangeStart(start._components), _rangeEnd(end._components), _options(RangeTriplet)
 {
 }
-CFI::CFI(const string& str) : _components(), _rangeStart(), _rangeEnd(), _options(0)
+CFI::CFI(const string& str) :
+#if EPUB_PLATFORM(WINRT)
+NativeBridge(),
+#endif
+_components(), _rangeStart(), _rangeEnd(), _options(0)
 {
     if ( CompileCFI(str) == false )
         HandleError(EPUBError::CFIParseFailed, _Str("Invalid CFI string: ", str.stl_str()));
+}
+CFI::CFI(const CFI& base, size_t fromIndex) :
+#if EPUB_PLATFORM(WINRT)
+NativeBridge(),
+#endif
+_components(), _rangeStart(), _rangeEnd(), _options(0)
+{
+	Assign(base, fromIndex);
 }
 bool CFI::operator==(const ePub3::CFI &o) const
 {
@@ -316,7 +331,7 @@ bool CFI::CompileCFI(const string &str)
             return false;
         }
         
-        // check the offsets at the end of each— they should be the same type
+        // check the offsets at the end of each??? they should be the same type
         if ( (_rangeStart.back().flags & Component::OffsetsMask) != (_rangeEnd.back().flags & Component::OffsetsMask) )
         {
             HandleError(EPUBError::CFIRangeInvalid, "Offsets at the end of range components are of different types.");
@@ -377,7 +392,7 @@ bool CFI::CompileComponentsToList(const StringList &strings, ComponentList *list
             list->emplace_back(str);
         }
     }
-    catch (const epub_spec_error& exc)
+    catch (const epub_spec_error&)
     {
         // re-throw any ePub spec errors
         throw;

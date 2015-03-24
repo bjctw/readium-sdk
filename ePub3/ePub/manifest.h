@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-29.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__manifest__
 #define __ePub3__manifest__
@@ -28,7 +27,7 @@
 #include <ePub3/property_holder.h>
 #include <ePub3/utilities/xml_identifiable.h>
 #include <map>
-#include <libxml/tree.h>
+#include <ePub3/xml/node.h>
 
 EPUB3_BEGIN_NAMESPACE
 
@@ -36,6 +35,12 @@ class Package;
 class ManifestItem;
 class ArchiveReader;
 class ByteStream;
+
+#ifdef SUPPORT_ASYNC
+class AsyncByteStream;
+#endif /* SUPPORT_ASYNC */
+
+typedef shared_ptr<Package>         PackagePtr;
 
 typedef shared_ptr<ManifestItem>    ManifestItemPtr;
 
@@ -51,7 +56,7 @@ typedef std::map<string, shared_ptr<ManifestItem>>  ManifestTable;
  properties for a ManifestItem, as of EPUB 3.
  
  This should ideally be an `enum class`, but it seems the compiler doesn't like
- performing arithmetic or bitwose operations on those, nor does it like me defining
+ performing arithmetic or bitwise operations on those, nor does it like me defining
  those arithmetic operations as methods on an `enum class`. Therefore it's all DIY.
  
  @see http://www.idpf.org/epub/30/spec/epub30-publications.html#sec-item-property-values
@@ -59,6 +64,9 @@ typedef std::map<string, shared_ptr<ManifestItem>>  ManifestTable;
  @ingroup epub-model
  */
 class ItemProperties
+#if EPUB_PLATFORM(WINRT)
+	: public NativeBridge
+#endif
 {
 public:
     ///
@@ -113,7 +121,7 @@ public:
      @param p The property bitfield against which to check.
      @result Returns `true` if all set bits in `p` are also set in `this`.
      */
-    bool            HasProperty(unsigned int p)             const   { return (_p & p) == p; }
+    bool            HasProperty(ItemProperties::value_type p)             const   { return (_p & p) == p; }
     
     /**
      Checks for the presence of one or more properties.
@@ -248,7 +256,10 @@ private:
  
  @ingroup epub-model
  */
-class ManifestItem : public std::enable_shared_from_this<ManifestItem>, public OwnedBy<Package>, public PropertyHolder, public XMLIdentifiable
+class ManifestItem : public PointerType<ManifestItem>, public OwnedBy<Package>, public PropertyHolder, public XMLIdentifiable
+#if EPUB_PLATFORM(WINRT)
+	, public NativeBridge
+#endif
 {
 public:
     typedef string              MimeType;
@@ -262,7 +273,10 @@ public:
     EPUB3_EXPORT                ManifestItem(ManifestItem&&);
     virtual                     ~ManifestItem();
     
-    virtual bool                ParseXML(shared_ptr<ManifestItem>& sharedMe, xmlNodePtr node);
+    FORCE_INLINE
+    PackagePtr                  GetPackage()                        const   { return Owner(); }
+    
+	virtual bool                ParseXML(shared_ptr<xml::Node> node);
 
     EPUB3_EXPORT
     string                      AbsolutePath()                      const;
@@ -280,20 +294,46 @@ public:
     // strips any query/fragment from the href before returning
     EPUB3_EXPORT
     string                      BaseHref()                          const;
-    
-    bool                        HasProperty(const string& property) const   { return _parsedProperties.HasProperty(ItemProperties(property)); }
-    bool                        HasProperty(ItemProperties::value_type prop)    const   { return _parsedProperties.HasProperty(prop); }
+
+    // NOTE: the two "HasProperty" functions below test for predefined "_parsedProperties"
+    // on the spine item, not for OPF package metadata.
+    // ... unlike the other HasProperty(std::vector<IRI>& properties) method further below!
+    // (TODO: very confusing API)
+    bool HasProperty(const string& property) const
+    {
+        auto itemProps = ItemProperties(property);
+        if (itemProps == ItemProperties::None)
+            return false;
+        return _parsedProperties.HasProperty(itemProps);
+    }
+    bool HasProperty(ItemProperties::value_type prop) const
+    {
+        if (prop == ItemProperties::value_type(ItemProperties::None))
+            return false;
+        return _parsedProperties.HasProperty(prop);
+    }
+
     EPUB3_EXPORT
     bool                        HasProperty(const std::vector<IRI>& properties)  const;
     
+    // fetch any relevant encryption information
+    EncryptionInfoPtr           GetEncryptionInfo()                 const;
+
+	bool						CanLoadDocument()					const;
+    
     // one-shot XML document loader
     EPUB3_EXPORT
-    xmlDocPtr                   ReferencedDocument()                const;
+	shared_ptr<xml::Document>	ReferencedDocument()                const;
     
     // stream the data
     EPUB3_EXPORT
     unique_ptr<ByteStream>      Reader()                            const;
-    
+
+#ifdef SUPPORT_ASYNC
+    EPUB3_EXPORT
+    unique_ptr<AsyncByteStream> AsyncReader()                       const;
+#endif /* SUPPORT_ASYNC */
+
 protected:
     string                  _href;
     MimeType                _mediaType;

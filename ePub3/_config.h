@@ -3,28 +3,27 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-02-05.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ////////////////////////////////////////////////////////////////////////////////
 // General doxygen input for the project as a whole
 
 /**
  @mainpage
- @copyright Copyright (c) 2012–2013 The Readium Foundation and contributors. Released under the GNU Public License, version 3.
+ @copyright Copyright (c) 2012???2013 The Readium Foundation and contributors. Released under the GNU Public License, version 3.
  @author Jim Dovey
  @author Boris Schneidermann
  @author Shane Meyer
@@ -37,14 +36,14 @@
  
  @defgroup archives Archive Handling
  
- @defgroup epub EPUB® 3 Engine
+ @defgroup epub EPUB?? 3 Engine
  @{
-    @defgroup epub-model EPUB® 3 Model
+    @defgroup epub-model EPUB?? 3 Model
     @{
         @defgroup navigation Navigation
     @}
 
-    @defgroup content-proc EPUB® 3 Content Processing
+    @defgroup content-proc EPUB?? 3 Content Processing
     @{
         @defgroup filters Content Filters
         @defgroup media-handlers Content Handlers
@@ -85,7 +84,18 @@
 # endif
 #endif
 
+#if EPUB_COMPILER(MSVC)
+# define _NORETURN_		__declspec(noreturn)
+#else
+# define _NORETURN_		__attribute__((noreturn))
+#endif
+
 #if EPUB_OS(WINDOWS)
+// Windows doesn't define ssize_t it seems
+typedef signed long ssize_t;
+#endif
+
+#if EPUB_PLATFORM(WIN)
 # ifndef EPUB3_EXPORT
 #  ifdef BUILDING_EPUB3
 #   define EPUB3_EXPORT __declspec(dllexport)
@@ -93,8 +103,6 @@
 #   define EPUB3_EXPORT __declspec(dllimport)
 #  endif
 # endif
-// Windows doesn't define ssize_t it seems
-typedef signed long ssize_t;
 #else
 # define EPUB3_EXPORT
 #endif
@@ -149,6 +157,7 @@ typedef signed long ssize_t;
 # endif
 #endif
 
+#if !EPUB_PLATFORM(WINRT)
 #if EPUB_COMPILER(MSVC)
 # pragma section(".CRT$XCU",read)
 # define INITIALIZER(f) \
@@ -160,15 +169,27 @@ typedef signed long ssize_t;
     static void f(void) __attribute__((constructor)); \
     static void f(void)
 #endif
-
+#endif
 // MSVC doesn't have this macro
 #ifndef __PRETTY_FUNCTION__
 # define __PRETTY_FUNCTION__ __FUNCTION__
 #endif
 
-#if EPUB_PLATFORM(WIN)
+#if EPUB_PLATFORM(WIN) || EPUB_PLATFORM(WINRT)
 # define strncasecmp _strnicmp
 # define snprintf(buf,count,fmt,...) _snprintf_s(buf, count, count, fmt, __VA_ARGS__)
+#endif
+
+#if EPUB_PLATFORM(WINRT)
+# define EPUB_USE_LIBXML2 0
+# define EPUB_USE_WIN_XML 1
+# define EPUB_ENABLE_XML_BUILDER 0
+# define EPUB_ENABLE_XML_C14N 0
+#else
+# define EPUB_USE_LIBXML2 1
+# define EPUB_USE_WIN_XML 0
+# define EPUB_ENABLE_XML_BUILDER 1
+# define EPUB_ENABLE_XML_C14N 0
 #endif
 
 #if EPUB_COMPILER_SUPPORTS(CXX_DELETED_FUNCTIONS)

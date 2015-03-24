@@ -3,28 +3,27 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-20.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <ePub3/xml/document.h>
 #include <ePub3/xml/element.h>
 #include <ePub3/xml/dtd.h>
 #include <libxml/xinclude.h>
 
-typedef std::map<ePub3::xml::Node*, xmlElementType> NodeMap;
+typedef std::map<std::shared_ptr<ePub3::xml::Node>, xmlElementType> NodeMap;
 
 void find_wrappers(xmlNodePtr node, NodeMap & nmap)
 {
@@ -41,7 +40,7 @@ void find_wrappers(xmlNodePtr node, NodeMap & nmap)
     
     // local wrapper
     if ( node->_private != nullptr )
-        nmap[reinterpret_cast<ePub3::xml::Node*>(node->_private)] = node->type;
+        nmap[reinterpret_cast<ePub3::xml::Node*>(node->_private)->shared_from_this()] = node->type;
     
     switch (node->type)
     {
@@ -74,13 +73,13 @@ void prune_unchanged_wrappers(xmlNodePtr node, NodeMap & nmap)
     
     if ( node->_private != nullptr )
     {
-        const NodeMap::iterator pos = nmap.find(reinterpret_cast<ePub3::xml::Node*>(node->_private));
+        const NodeMap::iterator pos = nmap.find(ePub3::xml::Wrapped<ePub3::xml::Node>(node));
         if ( pos != nmap.end() )
         {
             if ( pos->second == node->type )
                 nmap.erase(pos);
             else
-                node->_private = nullptr;
+                ePub3::xml::Node::Unwrap(node);
         }
     }
     
@@ -112,9 +111,9 @@ Document::Document(xmlDocPtr doc) : Node(reinterpret_cast<xmlNodePtr>(doc))
     if ( _xml == nullptr )
         throw InternalError("Failed to create new document");
     // ensure the right polymorphic type ptr is installed
-    _xml->_private = this;
+    //_xml->_private = this;
 }
-Document::Document(Element * rootElement) : Node(reinterpret_cast<xmlNodePtr>(xmlNewDoc(BAD_CAST "1.0")))
+Document::Document(std::shared_ptr<Element> rootElement) : Node(reinterpret_cast<xmlNodePtr>(xmlNewDoc(BAD_CAST "1.0")))
 {
     if ( SetRoot(rootElement) == nullptr )
         throw InternalError("Failed to set document root element");
@@ -130,7 +129,7 @@ string Document::Encoding() const
 {
     return xml()->encoding;
 }
-DTD * Document::InternalSubset() const
+std::shared_ptr<DTD> Document::InternalSubset() const
 {
     return Wrapped<DTD, _xmlDtd>(xmlGetIntSubset(const_cast<xmlDocPtr>(xml())));
 }
@@ -140,23 +139,21 @@ void Document::SetInternalSubset(const string &name, const string &externalID, c
     if ( dtd != nullptr && dtd->_private == nullptr )
         (void) Wrapped<DTD, _xmlDtd>(dtd);
 }
-Element * Document::Root()
+std::shared_ptr<Element> Document::Root()
 {
     return Wrapped<Element, _xmlNode>(xmlDocGetRootElement(xml()));
 }
-const Element * Document::Root() const
+std::shared_ptr<const Element> Document::Root() const
 {
     return Wrapped<Element, _xmlNode>(xmlDocGetRootElement(const_cast<xmlDocPtr>(xml())));
 }
-Element * Document::SetRoot(const string &name, const string &nsUri, const string &nsPrefix)
+std::shared_ptr<Element> Document::SetRoot(const string &name, const string &nsUri, const string &nsPrefix)
 {
-    Element * newRoot = new Element(name, this, nsUri, nsPrefix);
-    Element * result = SetRoot(newRoot);
-    if ( result != newRoot )
-        delete newRoot;
-    return newRoot;
+    auto newRoot = std::make_shared<Element>(name, std::static_pointer_cast<Document>(shared_from_this()), nsUri, nsPrefix);
+    auto result = SetRoot(newRoot);
+    return result;
 }
-Element * Document::SetRoot(const Node *nodeToCopy, bool recursive)
+std::shared_ptr<Element> Document::SetRoot(std::shared_ptr<const Node> nodeToCopy, bool recursive)
 {
     xmlNodePtr theCopy = xmlDocCopyNode(const_cast<xmlNodePtr>(nodeToCopy->xml()), xml(), (recursive ? 1 : 0));
     if ( theCopy == nullptr )
@@ -167,7 +164,7 @@ Element * Document::SetRoot(const Node *nodeToCopy, bool recursive)
         xmlFreeNode(oldRoot);       // the glue will delete any associated C++ object
     return Root();
 }
-Element * Document::SetRoot(Element * element)
+std::shared_ptr<Element> Document::SetRoot(std::shared_ptr<Element> element)
 {
     xmlNodePtr xmlRoot = (element == nullptr ? nullptr : element->xml());
     xmlNodePtr oldRoot = xmlDocSetRootElement(xml(), xmlRoot);
@@ -175,12 +172,12 @@ Element * Document::SetRoot(Element * element)
         xmlFreeNode(oldRoot);
     return Root();
 }
-Node * Document::AddNode(Node *commentOrPINode, bool beforeRoot)
+std::shared_ptr<Node> Document::AddNode(std::shared_ptr<Node> commentOrPINode, bool beforeRoot)
 {
     if ( commentOrPINode->Type() != NodeType::Comment && commentOrPINode->Type() != NodeType::ProcessingInstruction )
         throw std::invalid_argument(std::string(__PRETTY_FUNCTION__) + ": argument must be a Comment or Processing Instruction");
     
-    Element * root = Root();
+    auto root = Root();
     if ( root == nullptr )
     {
         AddChild(commentOrPINode);
@@ -196,11 +193,11 @@ Node * Document::AddNode(Node *commentOrPINode, bool beforeRoot)
     
     return commentOrPINode;
 }
-Node * Document::AddComment(const string &comment, bool beforeRoot)
+std::shared_ptr<Node> Document::AddComment(const string &comment, bool beforeRoot)
 {
     return AddNode(Wrapped<Node, _xmlNode>(xmlNewDocComment(xml(), comment.utf8())), beforeRoot);
 }
-Node * Document::AddProcessingInstruction(const ePub3::string &name, const ePub3::string &content, bool beforeRoot)
+std::shared_ptr<Node> Document::AddProcessingInstruction(const ePub3::string &name, const ePub3::string &content, bool beforeRoot)
 {
     return AddNode(Wrapped<Node, _xmlNode>(xmlNewDocPI(xml(), name.utf8(), content.utf8())), beforeRoot);
 }
@@ -219,10 +216,6 @@ int Document::ProcessXInclude(bool generateXIncludeNodes)
     int substitutionCount = xmlXIncludeProcessTreeFlags(root, generateXIncludeNodes ? 0 : XML_PARSE_NOXINCNODE);
     
     prune_unchanged_wrappers(Node::xml(), nmap);
-    for ( auto item : nmap )
-    {
-        delete item.first;
-    }
     
     if ( substitutionCount < 0 )
         throw InternalError("Failed to process XInclude", xmlGetLastError());
@@ -239,6 +232,17 @@ string Document::ContentOfNamedEntity(const string &name) const
     if ( entity == nullptr )
         return string();
     return entity->content;
+}
+void Document::WriteXML(OutputBuffer& outbuf) const
+{
+    outbuf.writeDocument(const_cast<xmlDocPtr>(xml()));
+}
+void Document::WriteXML(string& str) const
+{
+    std::ostringstream ss;
+    StreamOutputBuffer buf(ss);
+    WriteXML(buf);
+    str.assign(ss.str());
 }
 
 EPUB3_XML_END_NAMESPACE

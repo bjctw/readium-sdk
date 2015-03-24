@@ -3,27 +3,29 @@
  * ePub3
  *
  * Created by Pedro Reis Colaco (txtr) on 2013-05-29.
- * Copyright (c) 2012-2013 The Readium Foundation and contributors.
- * 
- * The Readium SDK is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//  
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+//  
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
+//  
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package org.readium.sdk.android;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+
+import android.util.Log;
 
 
 
@@ -49,6 +51,7 @@ public class EPub3 {
 
 	//TODO: Is this needed at all?
 	private static final int BUFFER_SIZE_INCREMENT = 2*1024*1024;
+	private static final String TAG = "EPub3";
 
 	
 	/**
@@ -87,6 +90,7 @@ public class EPub3 {
 		ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
 		buffer.position(0);
 		buffer.limit(0);
+//		Log.d(TAG, "createBuffer: "+bufferSize);
 		return buffer;
 	}
 	
@@ -97,6 +101,7 @@ public class EPub3 {
 	 */
 	private static void appendBytesToBuffer(ByteBuffer buffer, byte[] data) {
 		int newLimit = buffer.limit() + data.length;
+//		Log.d(TAG, "appendBytesToBuffer: "+newLimit);
 		buffer.limit(newLimit);
 		buffer.put(data);
 	}
@@ -114,6 +119,13 @@ public class EPub3 {
 	 * application context.
 	 */
 	public static native void setCachePath(String cachePath);
+	
+	/**
+	 * Checks if the supplied book is EPUB3. 
+	 * @param path Path to the book.
+	 * @return True if the book is EPUB3.
+	 */
+	public static native boolean isEpub3Book(final String path);
 
 	/**
 	 * Open an ePub3 book.
@@ -141,5 +153,20 @@ public class EPub3 {
 	public static void closeBook(final Container container) {
 		container.close();
 	}
-	
+
+    public static SdkErrorHandler m_SdkErrorHandler = null;
+    public static void setSdkErrorHandler(SdkErrorHandler sdkErrorHandler) {
+        m_SdkErrorHandler = sdkErrorHandler;
+    }
+
+	private static boolean handleSdkError(String message, boolean isSevereEpubError) {
+        if (m_SdkErrorHandler != null) {
+            return m_SdkErrorHandler.handleSdkError(message, isSevereEpubError);
+        }
+            
+        System.out.println("!SdkErrorHandler: " + message + " (" + (isSevereEpubError ? "warning" : "info") + ")");
+
+    	// never throws an exception
+    	return true;
+	}
 }

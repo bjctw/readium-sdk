@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-29.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "spine.h"
 #include "package.h"
@@ -37,21 +36,21 @@ SpineItem::SpineItem(SpineItem&& o) : OwnedBy(std::move(o)), PropertyHolder(std:
 SpineItem::~SpineItem()
 {
 }
-bool SpineItem::ParseXML(SpineItemPtr& sharedMe, xmlNodePtr node)
+bool SpineItem::ParseXML(shared_ptr<xml::Node> node)
 {
     SetXMLIdentifier(_getProp(node, "id"));
     _idref = _getProp(node, "idref");
-    if ( _getProp(node, "linear").tolower() == "false" )
+    if ( _getProp(node, "linear").tolower() == "no" )
         _linear = false;
     
-    auto holder = std::dynamic_pointer_cast<PropertyHolder>(sharedMe);
+    auto holder = CastPtr<PropertyHolder>();
     
     string properties = _getProp(node, "properties");
     if ( !properties.empty() )
     {
         for ( auto& property : properties.split(REGEX_NS::regex(",?\\s+")) )
         {
-            PropertyPtr prop = std::make_shared<Property>(holder);
+            PropertyPtr prop = Property::New(holder);
             prop->SetPropertyIdentifier(this->PropertyIRIFromString(property));
             this->AddProperty(prop);
         }
@@ -71,7 +70,7 @@ PageSpread SpineItem::Spread() const
         return PageSpread::Automatic;
     
     bool left = false, right = false;
-    ForEachProperty([&](shared_ptr<Property> item) {
+    ForEachProperty([&](PropertyPtr item) {
         // return early if both set
         if ( left && right )
             return;
@@ -106,7 +105,7 @@ shared_ptr<SpineItem> SpineItem::PriorStep() const
 }
 shared_ptr<SpineItem> SpineItem::at(ssize_t idx) const
 {
-    shared_ptr<SpineItem> result = std::const_pointer_cast<SpineItem>(enable_shared_from_this<SpineItem>::shared_from_this());
+    SpineItemPtr result = std::const_pointer_cast<SpineItem>(Ptr());
     
     ssize_t i = idx;
     

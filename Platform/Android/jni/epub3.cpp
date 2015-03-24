@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Pedro Reis Colaco (txtr) on 2013-05-29.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
-//
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
+//  
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+//  
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
+//  
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #include <string.h>
@@ -26,14 +25,17 @@
 
 #include <ePub3/archive.h>
 #include <ePub3/container.h>
+#include <ePub3/initialization.h>
+#include <ePub3/utilities/error_handler.h>
 
 #include "jni/jni.h"
 
 #include "epub3.h"
 #include "helpers.h"
 #include "container.h"
-#include "package.h"
+#include "packagejni.h"
 #include "iri.h"
+#include "resource_stream.h"
 
 
 using namespace std;
@@ -65,6 +67,9 @@ static const char *javaEPub3_createBufferSignature = "(I)Ljava/nio/ByteBuffer;";
 static const char *javaEPub3_appendBytesToBufferMethodName = "appendBytesToBuffer";
 static const char *javaEPub3_appendBytesToBufferSignature = "(Ljava/nio/ByteBuffer;[B)V";
 
+static const char *javaEPub3_handleSdkErrorMethodName = "handleSdkError";
+static const char *javaEPub3_handleSdkErrorSignature = "(Ljava/lang/String;Z)Z";
+
 
 /*
  * Exported variables
@@ -85,6 +90,9 @@ jmethodID addSpineItemToList_ID;
 jmethodID createNavigationTable_ID;
 jmethodID createNavigationPoint_ID;
 jmethodID addElementToParent_ID;
+jmethodID createManifestItemList_ID;
+jmethodID createManifestItem_ID;
+jmethodID addManifestItemToList_ID;
 
 
 /*
@@ -101,6 +109,7 @@ static jmethodID createStringList_ID;
 static jmethodID addStringToList_ID;
 static jmethodID createBuffer_ID;
 static jmethodID appendBytesToBuffer_ID;
+static jmethodID handleSdkError_ID;
 
 
 /*
@@ -169,13 +178,17 @@ jobject javaEPub3_createBuffer(JNIEnv *env, jint bufferSize) {
 }
 
 /**
- * Calls the java createBuffer method of EPub3 class
+ * Calls the java appendBytesToBuffer method of EPub3 class
  */
 void javaEPub3_appendBytesToBuffer(JNIEnv *env, jobject buffer, jbyteArray data) {
 	env->CallStaticVoidMethod(javaEPub3Class,
 			appendBytesToBuffer_ID, buffer, data);
 }
 
+jboolean javaEPub3_handleSdkError(JNIEnv *env, jstring message, jboolean isSevereEpubError) {
+	jboolean b = env->CallStaticBooleanMethod(javaEPub3Class, handleSdkError_ID, message, isSevereEpubError);
+	return b;
+}
 
 /*
  * Internal functions
@@ -196,18 +209,50 @@ static int onLoad_cacheJavaElements_epub3(JNIEnv *env) {
 			javaEPub3_createBufferMethodName, javaEPub3_createBufferSignature, ONLOAD_ERROR);
 	INIT_STATIC_METHOD_ID_RETVAL(appendBytesToBuffer_ID, javaEPub3Class, javaEPub3ClassName,
 			javaEPub3_appendBytesToBufferMethodName, javaEPub3_appendBytesToBufferSignature, ONLOAD_ERROR);
-
+	INIT_STATIC_METHOD_ID_RETVAL(handleSdkError_ID, javaEPub3Class, javaEPub3ClassName,
+			javaEPub3_handleSdkErrorMethodName, javaEPub3_handleSdkErrorSignature, ONLOAD_ERROR);
 	// Return JNI_VERSION for OK, if not one of the lines above already returned ONLOAD_ERROR
 	return JNI_VERSION;
+}
+
+// needed only for the LauncherErrorHandler() C++ callback,
+// set by initializeReadiumSDK()
+static JNIEnv* m_env = nullptr;
+
+static bool LauncherErrorHandler(const ePub3::error_details& err)
+{
+    const char * msg = err.message();
+
+	bool isSevereEpubError = (err.is_spec_error()
+			&& (err.severity() == ePub3::ViolationSeverity::Critical
+			|| err.severity() == ePub3::ViolationSeverity::Major));
+
+    LOGD("READIUM SDK ERROR HANDLER (%s): %s\n", isSevereEpubError ? "warning" : "info", msg);
+
+    jstring jmessage = m_env->NewStringUTF(msg);
+    jboolean b = javaEPub3_handleSdkError(m_env, jmessage, (jboolean)isSevereEpubError);
+    m_env->DeleteLocalRef(jmessage);
+    return (bool)b;
+    
+    // never throws an exception
+    //return ePub3::DefaultErrorHandler(err);
 }
 
 /**
  * Initializes the Readium SDK.
  */
-static void initializeReadiumSDK()
+static void initializeReadiumSDK(JNIEnv* env)
 {
+    m_env = env;
+    
 	LOGD("initializeReadiumSDK(): initializing Readium SDK...");
-    ePub3::Archive::Initialize();
+
+    ePub3::ErrorHandlerFn launcherErrorHandler = LauncherErrorHandler;
+    ePub3::SetErrorHandler(launcherErrorHandler);
+ 
+    ePub3::InitializeSdk();
+    ePub3::PopulateFilterManager();
+    
 	LOGD("initializeReadiumSDK(): initialization of Readium SDK finished");
 }
 
@@ -253,6 +298,12 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
     	return ONLOAD_ERROR;
     }
 
+    // Initialize the cached java elements from package
+    if(onLoad_cacheJavaElements_ResourceInputStream(env) == ONLOAD_ERROR) {
+    	LOGE("JNI_OnLoad(): failed to cache ResourceInputStream java elements");
+    	return ONLOAD_ERROR;
+    }
+
     // Initialize the rest of the cached java elements that are still in JavaObjectsFactory class
     // TODO: Move all these elements to each respective class and remove these lines
 
@@ -261,7 +312,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
 	INIT_STATIC_METHOD_ID_RETVAL(createSpineItemList_ID, javaJavaObjectsFactoryClass, javaJavaObjectsFactoryClassName,
 			"createSpineItemList", "()Ljava/util/List;", ONLOAD_ERROR);
 	INIT_STATIC_METHOD_ID_RETVAL(createSpineItem_ID, javaJavaObjectsFactoryClass, javaJavaObjectsFactoryClassName,
-			"createSpineItem", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lorg/readium/sdk/android/SpineItem;", ONLOAD_ERROR);
+			"createSpineItem", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Lorg/readium/sdk/android/SpineItem;", ONLOAD_ERROR);
 	INIT_STATIC_METHOD_ID_RETVAL(addSpineItemToList_ID, javaJavaObjectsFactoryClass, javaJavaObjectsFactoryClassName,
 			"addSpineItemToList", "(Ljava/util/List;Lorg/readium/sdk/android/SpineItem;)V", ONLOAD_ERROR);
 
@@ -271,6 +322,13 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
 			"createNavigationPoint", "(Ljava/lang/String;Ljava/lang/String;)Lorg/readium/sdk/android/components/navigation/NavigationPoint;", ONLOAD_ERROR);
 	INIT_STATIC_METHOD_ID_RETVAL(addElementToParent_ID, javaJavaObjectsFactoryClass, javaJavaObjectsFactoryClassName,
 			"addElementToParent", "(Lorg/readium/sdk/android/components/navigation/NavigationElement;Lorg/readium/sdk/android/components/navigation/NavigationElement;)V", ONLOAD_ERROR);
+
+	INIT_STATIC_METHOD_ID_RETVAL(createManifestItemList_ID, javaJavaObjectsFactoryClass, javaJavaObjectsFactoryClassName,
+			"createManifestItemList", "()Ljava/util/List;", ONLOAD_ERROR);
+	INIT_STATIC_METHOD_ID_RETVAL(createManifestItem_ID, javaJavaObjectsFactoryClass, javaJavaObjectsFactoryClassName,
+			"createManifestItem", "(Ljava/lang/String;Ljava/lang/String;)Lorg/readium/sdk/android/ManifestItem;", ONLOAD_ERROR);
+	INIT_STATIC_METHOD_ID_RETVAL(addManifestItemToList_ID, javaJavaObjectsFactoryClass, javaJavaObjectsFactoryClassName,
+			"addManifestItemToList", "(Ljava/util/List;Lorg/readium/sdk/android/ManifestItem;)V", ONLOAD_ERROR);
 
 	// Return the JNI version this library wants to use
     return JNI_VERSION;
@@ -301,21 +359,84 @@ Java_org_readium_sdk_android_EPub3_setCachePath(JNIEnv* env, jobject thiz, jstri
 
 /*
  * Class:     org_readium_sdk_android_EPub3
+ * Method:    isEpub3Book
+ * Signature: (Ljava/lang/String;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_org_readium_sdk_android_EPub3_isEpub3Book(JNIEnv* env, jobject thiz, jstring path) {
+	// Initialize core ePub3 SDK
+	initializeReadiumSDK(env);
+
+	std::string _path = jni::StringUTF(env, path);
+	LOGD("EPub3.isEpub3Book(): path received is '%s'", _path.c_str());
+
+    shared_ptr<ePub3::Container> _container = nullptr;
+    try {
+        _container = ePub3::Container::OpenContainer(_path);
+
+        shared_ptr<ePub3::Package> _package = nullptr;
+        try {
+        	_package = _container->DefaultPackage();
+
+        	if(_package != nullptr) {
+        		ePub3::string versionStr;
+        		int version = 0;
+
+        		versionStr = _package->Version();
+        	    if(versionStr.empty()) {
+                	LOGE("EPub3.isEpub3Book(): couldn't get package version");
+        	    } else {
+        	        // GNU libstdc++ seems to not want to let us use these C++11 routines...
+#ifndef _LIBCPP_VERSION
+        	        version = (int)strtol(versionStr.c_str(), nullptr, 10);
+#else
+        			version = std::stoi(versionStr.stl_str());
+#endif
+
+        			if(version >= 3) {
+        				LOGD("EPub3.isEpub3Book(): returning true");
+        				return JNI_TRUE;
+        			}
+        		}
+
+        	}
+        }
+        catch(const std::invalid_argument& ex) {
+        	LOGE("EPub3.isEpub3Book(): failed to open package: %s\n", ex.what());
+        }
+    }
+    catch (const std::invalid_argument& ex) {
+    	LOGE("EPub3.isEpub3Book(): failed to open container: %s\n", ex.what());
+    }
+
+	LOGD("EPub3.isEpub3Book(): returning false");
+	return JNI_FALSE;
+}
+
+/*
+ * Class:     org_readium_sdk_android_EPub3
  * Method:    openBook
  * Signature: (Ljava/lang/String;)Lorg/readium/sdk/android/Container
  */
 JNIEXPORT jobject JNICALL
 Java_org_readium_sdk_android_EPub3_openBook(JNIEnv* env, jobject thiz, jstring path) {
 	// Initialize core ePub3 SDK
-	initializeReadiumSDK();
+	initializeReadiumSDK(env);
 
 	char *nativePath;
 	GET_UTF8_RETVAL(nativePath, path, NULL);
 	LOGD("EPub3.openBook(): path received is '%s'", nativePath);
 
 	std::string spath = std::string(nativePath);
-	shared_ptr<ePub3::Container> _container = ePub3::Container::OpenContainer(spath);
-	LOGD("EPub3.openBook(): _container OK, version: %s\n", _container->Version().c_str());
+    
+    shared_ptr<ePub3::Container> _container = nullptr;
+    try {
+        _container = ePub3::Container::OpenContainer(spath);
+    }
+    catch (const std::invalid_argument& ex) {
+    	LOGD("OpenContainer() EXCEPTION: %s\n", ex.what());
+    }
+    
+    LOGD("EPub3.openBook(): _container OK, version: %s\n", _container->Version().c_str());
 
 	// Save container before sending it to Java
 	jni::Pointer container(_container, POINTER_GPS("container"));

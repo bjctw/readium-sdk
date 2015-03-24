@@ -3,23 +3,23 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-16.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "io.h"
+#include "../tree/document.h"
 
 EPUB3_XML_BEGIN_NAMESPACE
 
@@ -37,20 +37,50 @@ InputBuffer::~InputBuffer()
 int InputBuffer::read_cb(void *context, char *buffer, int len)
 {
     InputBuffer * p = reinterpret_cast<InputBuffer*>(context);
-    return static_cast<int>(p->read(reinterpret_cast<uint8_t*>(buffer), static_cast<size_t>(len)));
+
+    size_t toRead = static_cast<size_t>(len);
+    uint8_t* buf = reinterpret_cast<uint8_t*>(buffer);
+
+    size_t res = 0;
+    if (p->_encodingCheck != NULL && (std::strcmp(p->_encodingCheck, "utf-8") == 0) && len >= 3)
+    {
+        res = p->read(buf, 3);
+
+        // BOM check (0xEF,0xBB,0xBF)
+        if (res == 3 && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF)
+        {
+            // Skip BOM bytes
+            res = p->read(buf, toRead - 3);
+        }
+        else if (res > 0)
+        {
+            // no BOM, read more bytes
+            res += p->read(buf + res, toRead - res);
+        }
+    }
+    else
+    {
+        res = p->read(buf, toRead);
+    }
+    p->_encodingCheck = NULL;
+
+    return static_cast<int>(res);
 }
 int InputBuffer::close_cb(void *context)
 {
     InputBuffer * p = static_cast<InputBuffer*>(context);
     return (p->close() ? 0 : -1);
 }
-xmlDocPtr InputBuffer::xmlReadDocument(const char * url, const char * encoding, int options)
+std::shared_ptr<Document> InputBuffer::xmlReadDocument(const char * url, const char * encoding, int options)
 {
-    return xmlReadIO(_buf->readcallback, _buf->closecallback, _buf->context, url, encoding, options);
+    _encodingCheck = encoding;
+    xmlDocPtr raw = xmlReadIO(_buf->readcallback, _buf->closecallback, _buf->context, url, encoding, options);
+    return Wrapped<Document>(raw);
 }
-xmlDocPtr InputBuffer::htmlReadDocument(const char *url, const char *encoding, int options)
+std::shared_ptr<Document> InputBuffer::htmlReadDocument(const char *url, const char *encoding, int options)
 {
-    return htmlReadIO(_buf->readcallback, _buf->closecallback, _buf->context, url, encoding, options);
+    _encodingCheck = encoding;
+    return Wrapped<Document>(htmlReadIO(_buf->readcallback, _buf->closecallback, _buf->context, url, encoding, options));
 }
 
 OutputBuffer::OutputBuffer(const std::string & encoding)
@@ -102,6 +132,13 @@ bool StreamInputBuffer::close()
 {
     return true;
 }
+size_t StreamInputBuffer::size() const
+{
+    std::istream::pos_type pos = _input.tellg();
+    size_t result = (size_t)_input.seekg(0, std::ios::end).tellg();
+    _input.seekg(pos);
+    return result;
+}
 
 bool StreamOutputBuffer::write(const uint8_t *buffer, size_t len)
 {
@@ -114,6 +151,13 @@ bool StreamOutputBuffer::close()
 {
     _output.flush();
     return true;
+}
+size_t StreamOutputBuffer::size() const
+{
+    std::ostream::pos_type pos = _output.tellp();
+    size_t result = (size_t)_output.seekp(0, std::ios::end).tellp();
+    _output.seekp(pos);
+    return result;
 }
 
 EPUB3_XML_END_NAMESPACE

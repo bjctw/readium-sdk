@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-19.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <ePub3/xml/schema.h>
 #include <ePub3/xml/document.h>
@@ -28,9 +27,9 @@ EPUB3_XML_BEGIN_NAMESPACE
 
 Schema::Schema(_xmlSchema * xml) : _xml(xml), _owns_document(false)
 {
-    _xml->_private = this;
+    //_xml->_private = this;
 }
-Schema::Schema(class Document * document, bool assume_ownership) : _xml(NULL), _owns_document(false)
+Schema::Schema(std::shared_ptr<class Document> document, bool assume_ownership) : _xml(NULL), _owns_document(false)
 {
     SetDocument(document, assume_ownership);
 }
@@ -38,14 +37,14 @@ Schema::~Schema()
 {
     releaseDocument();
 }
-void Schema::SetDocument(class Document * document, bool assume_ownership)
+void Schema::SetDocument(std::shared_ptr<class Document> document, bool assume_ownership)
 {
     releaseDocument();
     
     bool created = false;
-    if ( document == NULL )
+    if ( !bool(document) )
     {
-        //document = new Document();
+        document = std::make_shared<class Document>();
         created = true;
     }
     
@@ -53,22 +52,25 @@ void Schema::SetDocument(class Document * document, bool assume_ownership)
     xmlSchemaParserCtxtPtr ctx = NULL;//xmlSchemaNewDocParserCtxt(document->xmlDoc());
     if ( ctx == NULL )
     {
-        if ( created )
-            delete document;
         throw ParserError("Failed to parse schema: ", xmlGetLastError());
+    }
+    
+    if (_xml != nullptr)
+    {
+        Node::Unwrap((xmlNodePtr)_xml);
+        xmlFreeNode((xmlNodePtr)_xml);
+        _xml = nullptr;
     }
     
     _xml = xmlSchemaParse(ctx);
     xmlSchemaFreeParserCtxt(ctx);
     
-    if ( _xml == NULL )
+    if ( _xml == nullptr )
     {
-        if ( created )
-            delete document;
         throw ParserError("Schema could not be parsed: ", xmlGetLastError());
     }
     
-    _xml->_private = this;
+    Rewrap(_xml, shared_from_this());
     _owns_document = assume_ownership || created;
 }
 string Schema::Name() const
@@ -93,8 +95,8 @@ void Schema::releaseDocument()
 {
     if ( _owns_document && _xml != NULL && _xml->doc != NULL && _xml->doc->_private != NULL )
     {
-        // delete the document's associated C++ object
-        delete reinterpret_cast<class Document *>(_xml->doc->_private);
+        // unwrap the associated document
+        Node::Unwrap((xmlNodePtr)_xml->doc);
         _owns_document = false;
     }
     
@@ -104,14 +106,14 @@ void Schema::releaseDocument()
         _xml = NULL;
     }
 }
-Document * Schema::Document()
+std::shared_ptr<Document> Schema::Document()
 {
     if ( _xml == NULL || _xml->doc == NULL )
         return NULL;
     
     return Wrapped<class Document, _xmlDoc>(_xml->doc);
 }
-const Document * Schema::Document() const
+std::shared_ptr<const class Document> Schema::Document() const
 {
     return const_cast<Schema*>(this)->Document();
 }

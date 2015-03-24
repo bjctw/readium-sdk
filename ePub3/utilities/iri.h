@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-01-15.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__iri__
 #define __ePub3__iri__
@@ -61,6 +60,9 @@ public:
     EPUB3_EXPORT
     static string gEPUBScheme;
     
+    EPUB3_EXPORT
+    static void AddStandardScheme(const string& scheme);
+    
 public:
     ///
     /// Initializes an empty (and thus invalid) IRI.
@@ -100,7 +102,7 @@ public:
      resource.
      */
     EPUB3_EXPORT
-    IRI(const string& scheme, const string& host, const string& path, const string& query="", const string& fragment="");
+    IRI(const string& scheme, const string& host, const string& path, const string& query=string(), const string& fragment=string());
     
     ///
     /// Create a copy of an existing IRI.
@@ -124,6 +126,14 @@ public:
     /// Assigns ownership of the value of another IRI (move assignment).
     EPUB3_EXPORT
     IRI&            operator=(IRI&& o);
+    
+    /**
+     Assigns the IRI the value represented by the given string.
+     @param str The IRI string to parse and assign.
+     @throw std::invalid_argument if the input string does not represent a valid IRI.
+     */
+    EPUB3_EXPORT
+    IRI&            operator=(const string& str);
     
     /// @}
     
@@ -239,10 +249,20 @@ public:
     
     /**
      Assigns a host to this IRI.
+     @note The host **must not** contain a port number. Any instance of the
+     characters '`[`', '`]`', or '`:`' will cause the host to be rejected, as these
+     characters are only valid in IPv6-address hostnames such as `[ff:8::1]`.
      @param host The new host component.
      */
     EPUB3_EXPORT
     void            SetHost(const string& host);
+    
+    /**
+     Assigns a port number to this IRI.
+     @param port The new port number.
+     */
+    EPUB3_EXPORT
+    void            SetPort(uint16_t port);
     
     /**
      Sets credentials for this IRI.

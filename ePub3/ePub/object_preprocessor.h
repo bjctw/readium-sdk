@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-01-31.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__object_preprocessor__
 #define __ePub3__object_preprocessor__
@@ -37,12 +36,15 @@ class Package;
  elements with `iframe` elements referencing the appropriate DHTML handler.
  @ingroup filters
  */
-class ObjectPreprocessor : public ContentFilter
+class ObjectPreprocessor : public ContentFilter, public PointerType<ObjectPreprocessor>
 {
 protected:
     ///
     /// Matches only mnifest items with a media-type of "application/xhtml+xml" or "text/html".
-    static bool ShouldApply(const ManifestItem* item, const EncryptionInfo* encInfo);
+    static bool ShouldApply(ConstManifestItemPtr item);
+    
+    /// The factory routine
+    static ContentFilterPtr ObjectFilterFactory(ConstPackagePtr package);
 
 private:
     ///
@@ -56,7 +58,7 @@ public:
      @param pkg The package to which this filter will apply.
      */
     EPUB3_EXPORT
-    ObjectPreprocessor(const Package* pkg, const string& openButtonTitle = "Open Fullscreen");
+    ObjectPreprocessor(ConstPackagePtr pkg, const string& openButtonTitle = "Open Fullscreen");
     
     ///
     /// Standard copy constructor.
@@ -72,7 +74,7 @@ public:
     
     ///
     /// This preprocessor requires access to the entire content document at once.
-    virtual bool    RequiresCompleteData()      const   { return true; }
+    virtual OperatingMode GetOperatingMode() const OVERRIDE { return OperatingMode::RequiresCompleteData; }
     
     /**
      Performs the static replacement of `object` tags whose `type` attribute
@@ -97,7 +99,10 @@ public:
      is our intention that these rules will make it possible for content authors to
      anticipate these substitutions and build CSS or JavaScript rules directly.
      */
-    virtual void*   FilterData(void* data, size_t len, size_t* outputLen);
+    virtual void*   FilterData(FilterContext* context, void* data, size_t len, size_t* outputLen) OVERRIDE;
+    
+    // register with the filter manager
+    static void Register();
     
 protected:
     /**

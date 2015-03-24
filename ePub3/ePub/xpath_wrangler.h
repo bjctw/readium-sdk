@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-11-29.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // this is a temporary solution which will be replaced with the XML object library soon
 
@@ -26,7 +25,7 @@
 
 #include <ePub3/epub3.h>
 #include <ePub3/utilities/utfstring.h>
-#include <libxml/xpath.h>
+#include <ePub3/xml/xpath.h>
 #include <map>
 #include <vector>
 
@@ -56,7 +55,7 @@ public:
      @see RegisterNamespaces(const NamespaceList&)
      */
     EPUB3_EXPORT
-    XPathWrangler(xmlDocPtr doc, const NamespaceList & namespaces = NamespaceList());
+    XPathWrangler(shared_ptr<xml::Document> doc, const NamespaceList & namespaces = NamespaceList());
     ///
     /// Copy constructor.
     EPUB3_EXPORT
@@ -79,7 +78,7 @@ public:
      values.
      */
     EPUB3_EXPORT
-    StringList      Strings(const string& xpath, xmlNodePtr node=nullptr);
+	StringList      Strings(const string& xpath, shared_ptr<xml::Node> node = nullptr);
     
     /**
      Evaluates an XPath as a boolean expression.
@@ -99,7 +98,7 @@ public:
      Nodes(const string&, xmlNodePtr).
      */
     EPUB3_EXPORT
-    bool            Matches(const string& xpath, xmlNodePtr node=nullptr);
+	bool            Matches(const string& xpath, shared_ptr<xml::Node> node = nullptr);
     
     /**
      Evaluates an XPath, returning a set of all matching nodes.
@@ -110,7 +109,7 @@ public:
      specified subtree.
      */
     EPUB3_EXPORT
-    xmlNodeSetPtr   Nodes(const string& xpath, xmlNodePtr node=nullptr);
+    xml::NodeSet	Nodes(const string& xpath, shared_ptr<xml::Node> node=nullptr);
     
     /// @}
     
@@ -167,7 +166,8 @@ public:
     /// @}
     
 protected:
-    xmlXPathContextPtr  _ctx;   ///< The libxml2 XPath context object.
+	shared_ptr<xml::Document>	_doc;			///< The XML document on which this will operate.
+	NamespaceList				_namespaces;	///< The namespaces to register when running XPath queries.
 };
 
 EPUB3_END_NAMESPACE

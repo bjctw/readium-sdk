@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-04-08.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Common pieces used by all platforms
 #include "run_loop_common.ipp"
@@ -59,39 +58,39 @@ void RunLoop::PerformFunction(std::function<void ()> fn)
 {
     CFRunLoopPerformBlock(_cf, ADD_MODE_ARG, ^{fn();});
 }
-void RunLoop::AddTimer(Timer* timer)
+void RunLoop::AddTimer(TimerPtr timer)
 {
     CFRunLoopAddTimer(_cf, timer->_cf, ADD_MODE_ARG);
 }
-bool RunLoop::ContainsTimer(Timer* timer) const
+bool RunLoop::ContainsTimer(TimerPtr timer) const
 {
     return (CFRunLoopContainsTimer(_cf, timer->_cf, ADD_MODE_ARG) == TRUE);
 }
-void RunLoop::RemoveTimer(Timer* timer)
+void RunLoop::RemoveTimer(TimerPtr timer)
 {
     CFRunLoopRemoveTimer(_cf, timer->_cf, ADD_MODE_ARG);
 }
-void RunLoop::AddEventSource(EventSource* source)
+void RunLoop::AddEventSource(EventSourcePtr source)
 {
     CFRunLoopAddSource(_cf, source->_cf, ADD_MODE_ARG);
 }
-bool RunLoop::ContainsEventSource(EventSource* source) const
+bool RunLoop::ContainsEventSource(EventSourcePtr source) const
 {
     return (CFRunLoopContainsSource(_cf, source->_cf, ADD_MODE_ARG) == TRUE);
 }
-void RunLoop::RemoveEventSource(EventSource* source)
+void RunLoop::RemoveEventSource(EventSourcePtr source)
 {
     CFRunLoopRemoveSource(_cf, source->_cf, ADD_MODE_ARG);
 }
-void RunLoop::AddObserver(Observer* observer)
+void RunLoop::AddObserver(ObserverPtr observer)
 {
     CFRunLoopAddObserver(_cf, observer->_cf, ADD_MODE_ARG);
 }
-bool RunLoop::ContainsObserver(Observer* observer) const
+bool RunLoop::ContainsObserver(ObserverPtr observer) const
 {
     return (CFRunLoopContainsObserver(_cf, observer->_cf, ADD_MODE_ARG) == TRUE);
 }
-void RunLoop::RemoveObserver(Observer* observer)
+void RunLoop::RemoveObserver(ObserverPtr observer)
 {
     CFRunLoopRemoveObserver(_cf, observer->_cf, ADD_MODE_ARG);
 }
@@ -237,7 +236,7 @@ void RunLoop::Observer::Cancel()
     CFRunLoopObserverInvalidate(_cf);
 }
 
-RunLoop::EventSource::EventSource(EventHandlerFn fn) : _cf(nullptr), _rl(), _fn()
+RunLoop::EventSource::EventSource(EventHandlerFn fn) : _cf(nullptr), _rl(), _fn(fn)
 {
     CFRunLoopSourceContext ctx = {
         .version            = 0,
