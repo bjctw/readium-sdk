@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-02-04.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__media_support_info__
 #define __ePub3__media_support_info__
@@ -44,32 +43,35 @@ class ManifestItem;
  
  @ingroup utilities
  */
-class MediaSupportInfo : public std::enable_shared_from_this<MediaSupportInfo>, public OwnedBy<Package>
+class MediaSupportInfo : public PointerType<MediaSupportInfo>, public OwnedBy<Package>
+#if EPUB_PLATFORM(WINRT)
+	, public NativeBridge
+#endif
 {
 public:
     ///
     /// A list of manifest items.
-    typedef shared_list<ManifestItem>   ManifestItemList;
+    typedef shared_vector<ManifestItem>   ManifestItemList;
     
     ///
     /// Possible types of support provided.
     enum class EPUB3_EXPORT SupportType : uint8_t
     {
         Unsupported             = 0,    ///< The media type is not supported.
-        IntrinsicSupport        = 1,    ///< The rendering engine undersands this media type with no outside help.
+        IntrinsicSupport        = 1,    ///< The rendering engine understands this media type with no outside help.
         SupportedWithHandler    = 2     ///< The publication provides a DHTML handler for this media type.
     };
     
 public:
     ///
     /// The default constructor creates an object with no information.
-    EPUB3_EXPORT    MediaSupportInfo(shared_ptr<Package>& owner);
+    EPUB3_EXPORT    MediaSupportInfo(shared_ptr<Package> owner);
     ///
     /// A simple constructor, normally used to define intrinsic support.
-    EPUB3_EXPORT    MediaSupportInfo(shared_ptr<Package>& owner, const string& mediaType, bool supported=true);
+    EPUB3_EXPORT    MediaSupportInfo(shared_ptr<Package> owner, const string& mediaType, bool supported=true);
     ///
     /// The real constructor takes a specific SupportType value.
-    EPUB3_EXPORT    MediaSupportInfo(shared_ptr<Package>& owner, const string& mediaType, SupportType support);
+    EPUB3_EXPORT    MediaSupportInfo(shared_ptr<Package> owner, const string& mediaType, SupportType support);
     ///
     /// Copy constructor.
     EPUB3_EXPORT    MediaSupportInfo(const MediaSupportInfo& o);

@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2012-12-28.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__encryption__
 #define __ePub3__encryption__
@@ -43,7 +42,10 @@ class Container;
  @see http://www.idpf.org/epub/30/spec/epub30-ocf.html#font-obfuscation
  @see http://www.w3.org/TR/xmlenc-core1/
  */
-class EncryptionInfo : public std::enable_shared_from_this<EncryptionInfo>, public OwnedBy<Container>
+class EncryptionInfo : public PointerType<EncryptionInfo>, public OwnedBy<Container>
+#if EPUB_PLATFORM(WINRT)
+	, public NativeBridge
+#endif
 {
 public:
     ///
@@ -53,7 +55,7 @@ public:
 public:
     ///
     /// Creates a new EncryptionInfo with no details filled in.
-                    EncryptionInfo(shared_ptr<Container>& owner) : OwnedBy(owner), _algorithm(), _path() {}
+                    EncryptionInfo(ContainerPtr owner) : OwnedBy(owner), _algorithm(), _path() {}
     ///
     /// Copy constructor.
                     EncryptionInfo(const EncryptionInfo& o) : OwnedBy(o), _algorithm(o._algorithm), _path(o._path) {}
@@ -70,7 +72,7 @@ public:
      @see http://www.w3.org/TR/xmlenc-core1/#sec-EncryptedData
      */
     EPUB3_EXPORT
-    bool            ParseXML(xmlNodePtr node);
+    bool            ParseXML(shared_ptr<xml::Node> node);
     
     ///
     /// Returns an algorithm URI as defined in XML-ENC or OCF.

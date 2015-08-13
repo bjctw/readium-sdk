@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-05-06.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__property_extension__
 #define __ePub3__property_extension__
@@ -27,7 +26,7 @@
 #include <ePub3/utilities/utfstring.h>
 #include <ePub3/utilities/iri.h>
 #include <ePub3/utilities/xml_identifiable.h>
-#include <libxml/tree.h>
+#include <ePub3/xml/node.h>
 #include <memory>
 
 EPUB3_BEGIN_NAMESPACE
@@ -39,7 +38,10 @@ typedef shared_ptr<PropertyExtension>   PropertyExtensionPtr;
 
 ///
 /// An extension to an existing property, providing additional related metadata.
-class PropertyExtension : public std::enable_shared_from_this<PropertyExtension>, public OwnedBy<Property>, public XMLIdentifiable
+class PropertyExtension : public PointerType<PropertyExtension>, public OwnedBy<Property>, public XMLIdentifiable
+#if EPUB_PLATFORM(WINRT)
+	, public NativeBridge
+#endif
 {
 private:
     ///
@@ -63,7 +65,7 @@ public:
     virtual         ~PropertyExtension() {}
     
     EPUB3_EXPORT
-    bool            ParseMetaElement(xmlNodePtr node);
+    bool            ParseMetaElement(shared_ptr<xml::Node> node);
     
     ///
     /// Retrieves the extension's property IRI, declaring its type.

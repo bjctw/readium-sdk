@@ -3,27 +3,28 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-04-08.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__run_loop__
 #define __ePub3__run_loop__
 
 //#undef EPUB_USE_CF
 //#define EPUB_OS_ANDROID 1
+
+#include <ePub3/base.h>
 
 #if EPUB_USE(CF)
 # include <CoreFoundation/CoreFoundation.h>
@@ -38,21 +39,26 @@ struct ALooper;
 # include <time.h>
 #endif
 
+#include <ePub3/epub3.h>
 #include <ePub3/utilities/basic.h>
 #include <ePub3/utilities/utfstring.h>
 #include <chrono>
 #include <list>
 #include <mutex>
 #include <atomic>
-#include <ePub3/utilities/ref_counted.h>
 
 #if EPUB_USE(CF)
 #include "cf_helpers.h"
 #endif
 
+#if EPUB_PLATFORM(WINRT)
+#include "ThreadEmulation.h"
+using namespace Windows::System::Threading;
+#endif
+
 EPUB3_BEGIN_NAMESPACE
 
-class RunLoop
+class RunLoop : public PointerType<RunLoop>
 {
 public:
     enum class EPUB3_EXPORT ExitReason : uint8_t
@@ -63,7 +69,25 @@ public:
         RunHandledSource    = 4     ///< The RunLoop processed a single source and was told to return after doing so.
     };
     
-    class Observer : public RefCountable
+    class Observer;
+    class EventSource;
+    class Timer;
+        
+    typedef std::shared_ptr<Observer>       ObserverPtr;
+    typedef std::shared_ptr<EventSource>    EventSourcePtr;
+    typedef std::shared_ptr<Timer>          TimerPtr;
+    
+protected:
+    class _SourceBase
+    {
+    public:
+        _SourceBase() {}
+        virtual ~_SourceBase() {}
+    };
+    typedef std::shared_ptr<_SourceBase>    _SourceBasePtr;
+    
+public:
+    class Observer : public PointerType<Observer>
     {
     public:
         ///
@@ -153,7 +177,8 @@ public:
         void            Cancel();
     };
     
-    class EventSource : public RefCountable
+public:
+    class EventSource : public PointerType<EventSource>, public _SourceBase
     {
     public:
         typedef std::function<void(EventSource&)>   EventHandlerFn;
@@ -166,6 +191,7 @@ public:
         int                                 _evt[2];    ///< The event's pipe file descriptors.
 #elif EPUB_OS(WINDOWS)
         HANDLE                              _event;
+		std::vector<std::weak_ptr<RunLoop>>	_runLoops;
 #else
         std::atomic<bool>                   _signalled; ///< Whether the source has been signalled.
         bool                                _cancelled; ///< Whether the source is cancelled.
@@ -222,7 +248,7 @@ public:
         
     };
     
-    class Timer : public RefCountable
+    class Timer : public PointerType<Timer>, public _SourceBase
     {
     public:
         typedef std::function<void(Timer&)>  TimerFn;
@@ -245,22 +271,26 @@ public:
         
     private:
 #if EPUB_USE(CF)
-        CFRefCounted<CFRunLoopTimerRef> _cf;        ///< The underlying CF type of the timer.
+        CFRefCounted<CFRunLoopTimerRef>		_cf;        ///< The underlying CF type of the timer.
 #elif EPUB_OS(ANDROID)
-        timer_t                         _timer;     ///< The underlying Linux timer.
-        int                             _pipeFDs[2];///< The pipe endpoints used with ALooper.
-        TimerFn                         _fn;        ///< The function to call when the timer fires.
+        timer_t								_timer;     ///< The underlying Linux timer.
+        int									_pipeFDs[2];///< The pipe endpoints used with ALooper.
+        TimerFn								_fn;        ///< The function to call when the timer fires.
 #elif EPUB_OS(WINDOWS)
-        HANDLE                          _handle;
-        Clock::time_point               _fireDate;
-        Clock::duration                 _interval;
-        TimerFn                         _fn;
-        bool                            _cancelled;
+#if EPUB_PLATFORM(WINRT)
+		ThreadPoolTimer^					_timer;
+#endif
+		HANDLE								_handle;
+		std::vector<std::weak_ptr<RunLoop>>	_runLoops;
+        Clock::time_point					_fireDate;
+        Clock::duration						_interval;
+        TimerFn								_fn;
+        bool								_cancelled;
 #else
-        Clock::time_point               _fireDate;  ///< The date at which the timer will fire.
-        TimerFn                         _fn;        ///< The function to call when the timer fires.
-        Clock::duration                 _interval;  ///< The interval at which the timer repeats (if any)
-        bool                            _cancelled; ///< Set to `true` when the timer is cancelled.
+        Clock::time_point					_fireDate;  ///< The date at which the timer will fire.
+        TimerFn								_fn;        ///< The function to call when the timer fires.
+        Clock::duration						_interval;  ///< The interval at which the timer repeats (if any)
+        bool								_cancelled; ///< Set to `true` when the timer is cancelled.
 #endif
         
         friend class RunLoop;
@@ -322,6 +352,7 @@ public:
         bool            operator==(const Timer&) const;
         bool            operator!=(const Timer&o) const { return this->operator==(o) == false; }
         
+        bool            operator<(const Timer&) const;	//bjctw, compatible with clang@linux
         ///
         /// Cancels the timer, causing it to never fire again.
         EPUB3_EXPORT
@@ -397,7 +428,7 @@ public:
     ///
     /// This is the only way to obtain a RunLoop. Use it wisely.
     EPUB3_EXPORT
-    static RunLoop* CurrentRunLoop();
+    static RunLoopPtr CurrentRunLoop();
 
     EPUB3_EXPORT    ~RunLoop();
     
@@ -409,41 +440,41 @@ public:
     ///
     /// Adds a timer to the run loop.
     EPUB3_EXPORT
-    void            AddTimer(Timer* timer);
+    void            AddTimer(TimerPtr timer);
     ///
     /// Whether a timer is registered on this runloop.
     EPUB3_EXPORT
-    bool            ContainsTimer(Timer* timer)               const;
+    bool            ContainsTimer(TimerPtr timer)            const;
     ///
     /// Removes the timer from this RunLoop (without cancelling it).
     EPUB3_EXPORT
-    void            RemoveTimer(Timer* timer);
+    void            RemoveTimer(TimerPtr timer);
     
     ///
     /// Adds an event source to the run loop.
     EPUB3_EXPORT
-    void            AddEventSource(EventSource* source);
+    void            AddEventSource(EventSourcePtr source);
     ///
     /// Whether an event source is registered on this runloop.
     EPUB3_EXPORT
-    bool            ContainsEventSource(EventSource* source)  const;
+    bool            ContainsEventSource(EventSourcePtr source)  const;
     ///
     /// Removes an event source from this RunLoop (without cancelling it).
     EPUB3_EXPORT
-    void            RemoveEventSource(EventSource* source);
+    void            RemoveEventSource(EventSourcePtr source);
     
     ///
     /// Adds an observer to the run loop.
     EPUB3_EXPORT
-    void            AddObserver(Observer* observer);
+    void            AddObserver(ObserverPtr observer);
     ///
     /// Whether an observer is registered on this runloop.
     EPUB3_EXPORT
-    bool            ContainsObserver(Observer* observer)      const;
+    bool            ContainsObserver(ObserverPtr observer)      const;
     ///
     /// Removes an observer from this RunLoop (without cancelling it).
     EPUB3_EXPORT
-    void            RemoveObserver(Observer* observer);
+    void            RemoveObserver(ObserverPtr observer);
     
     /**
      Run the RunLoop, either indefinitely, for a specific duration, and/or until an event occurs.
@@ -483,17 +514,21 @@ public:
     EPUB3_EXPORT
     void            WakeUp();
     
+# if EPUB_OS(WINDOWS) && EPUB_PLATFORM(WINRT)
+	static void InitRunLoopTLSKey();
+	static void KillRunLoopTLSKey();
+# endif
+
 protected:
     ///
     /// Internal Run function which takes an explicit timeout duration type.
     EPUB3_EXPORT
     ExitReason      RunInternal(bool returnAfterSourceHandled, std::chrono::nanoseconds& timeout);
     
-    
     ///
     /// Obtains the run loop for the current thread.
     EPUB3_EXPORT    RunLoop();
-    
+
 private:
     ///
     /// No copy constructor
@@ -514,20 +549,22 @@ private:
 #if !EPUB_OS(ANDROID) && !EPUB_OS(WINDOWS) && !EPUB_USE(CF)
     ///
     /// Collects all timers ready to fire
-    std::vector<Timer*>         CollectFiringTimers();
+    //shared_vector<Timer>        CollectFiringTimers();
+    std::vector<RunLoop::Timer*>	CollectFiringTimers();
     ///
     /// Collects all sources that have been signalled
-    std::vector<EventSource*>   CollectFiringSources(bool onlyOne);
+    //shared_vector<EventSource>  CollectFiringSources(bool onlyOne);
+    shared_vector<RunLoop::EventSource>  CollectFiringSources(bool onlyOne);
     ///
     /// If a timer will fire before the given timeout, returns a new timeout
     std::chrono::system_clock::time_point   TimeoutOrTimer(std::chrono::system_clock::time_point& timeout);
 #elif EPUB_OS(WINDOWS)
     ///
     /// Process a firing timer
-    void            ProcessTimer(RefCounted<Timer> timer);
+    void            ProcessTimer(TimerPtr timer);
     ///
     /// Process a firing event source
-    void            ProcessEventSource(RefCounted<EventSource> source);
+    void            ProcessEventSource(EventSourcePtr source);
 #endif
     
 private:
@@ -539,33 +576,39 @@ private:
 
     std::recursive_mutex            _listLock;
     
-    typedef std::map<int,RefCounted<RefCountable>> SourceMap_t;
+    typedef std::map<int,_SourceBasePtr> SourceMap_t;
     SourceMap_t         _handlers;      ///< Maps event fds to their owners.
     
-    std::list<RefCounted<Observer>> _observers;
+    shared_list<Observer>           _observers;
     Observer::Activity              _observerMask;
     std::atomic<bool>               _waiting;
 #elif EPUB_OS(WINDOWS)
-    HANDLE                                      _wakeHandle;
-    std::map<HANDLE, RefCounted<Timer>>         _timers;
-    std::map<HANDLE, RefCounted<EventSource>>   _sources;
-    std::list<RefCounted<Observer>>             _observers;
-    std::recursive_mutex                        _listLock;
-    std::atomic<bool>                           _waiting;
-    std::atomic<bool>                           _stop;
-    std::atomic<bool>                           _resetHandles;
-    Observer::Activity                          _observerMask;
+    HANDLE                              _wakeHandle;
+    std::map<HANDLE, TimerPtr>          _timers;
+    std::map<HANDLE, EventSourcePtr>    _sources;
+    shared_list<Observer>               _observers;
+    std::recursive_mutex                _listLock;
+    std::atomic<bool>                   _waiting;
+    std::atomic<bool>                   _stop;
+    std::atomic<bool>                   _resetHandles;
+    Observer::Activity                  _observerMask;
+
+
+# if EPUB_PLATFORM(WINRT)
+	static DWORD RunLoopTLSKey;
+# endif
 #else
-    std::list<RefCounted<Timer>>        _timers;
-    std::list<RefCounted<Observer>>     _observers;
-    std::list<RefCounted<EventSource>>  _sources;
+    shared_list<Timer>                  _timers;
+    shared_list<Observer>               _observers;
+    shared_list<EventSource>            _sources;
     std::recursive_mutex                _listLock;
     std::mutex                          _conditionLock;
     std::condition_variable             _wakeUp;
     std::atomic<bool>                   _waiting;
     std::atomic<bool>                   _stop;
     Observer::Activity                  _observerMask;
-    const Timer*                        _waitingUntilTimer;
+    //const TimerPtr                      _waitingUntilTimer;
+    std::shared_ptr<const Timer>        _waitingUntilTimer;
 #endif
 
 };

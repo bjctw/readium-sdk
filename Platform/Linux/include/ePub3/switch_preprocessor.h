@@ -3,21 +3,20 @@
 //  ePub3
 //
 //  Created by Jim Dovey on 2013-01-31.
-//  Copyright (c) 2012-2013 The Readium Foundation and contributors.
+//  Copyright (c) 2014 Readium Foundation and/or its licensees. All rights reserved.
 //  
-//  The Readium SDK is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
+//  This program is distributed in the hope that it will be useful, but WITHOUT ANY 
+//  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 //  
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
+//  Licensed under Gnu Affero General Public License Version 3 (provided, notwithstanding this notice, 
+//  Readium Foundation reserves the right to license this material under a different separate license, 
+//  and if you have done so, the terms of that separate license control and the following references 
+//  to GPL do not apply).
 //  
-//  You should have received a copy of the GNU General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+//  This program is free software: you can redistribute it and/or modify it under the terms of the GNU 
+//  Affero General Public License as published by the Free Software Foundation, either version 3 of 
+//  the License, or (at your option) any later version. You should have received a copy of the GNU 
+//  Affero General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef __ePub3__switch_preprocessor__
 #define __ePub3__switch_preprocessor__
@@ -44,7 +43,7 @@ EPUB3_BEGIN_NAMESPACE
  It should be used only for reading, never for writing.
  @ingroup filters
  */
-class SwitchPreprocessor : public ContentFilter
+class SwitchPreprocessor : public ContentFilter, public PointerType<SwitchPreprocessor>
 {
 public:
     ///
@@ -54,35 +53,30 @@ public:
 protected:
     /// Only documents whose manifest items are XHTML with the `switch` property
     /// will be filtered.
-    static bool SniffSwitchableContent(const ManifestItem* item, const EncryptionInfo* encInfo);
+    static bool SniffSwitchableContent(ConstManifestItemPtr item);
+    
+    static ContentFilterPtr SwitchFilterFactory(ConstPackagePtr package);
     
 public:
-    /**
-     This constructor creates a preprocessor which supports content identified by
-     any of the provided namespaces.
-     @param supportedNamespaces A list of namespaces whose content is supported by
-     the renderer.
-     */
-    SwitchPreprocessor(const NamespaceList& supportedNamespaces) : ContentFilter(SniffSwitchableContent), _supportedNamespaces(supportedNamespaces) {}
     
     /**
      The default constructor indicates that no additional content is supported, and
      the resulting filter will only preserve the content of epub:default tags.
      */
-    SwitchPreprocessor() : ContentFilter(SniffSwitchableContent), _supportedNamespaces() {}
+    SwitchPreprocessor() : ContentFilter(SniffSwitchableContent) {}
     
     ///
     /// The standard copy constructor.
-    SwitchPreprocessor(const SwitchPreprocessor& o) : ContentFilter(o), _supportedNamespaces(o._supportedNamespaces) {}
+    SwitchPreprocessor(const SwitchPreprocessor& o) : ContentFilter(o) {}
     
     ///
     /// The standard C++11 'move' constructor.
-    SwitchPreprocessor(SwitchPreprocessor&& o) : ContentFilter(std::move(o)), _supportedNamespaces(std::move(o._supportedNamespaces)) {}
+    SwitchPreprocessor(SwitchPreprocessor&& o) : ContentFilter(std::move(o)) {}
     
     /**
      This processor won't work on streamed data, it requires the whole thing at once.
      */
-    virtual bool RequiresCompleteData() const { return true; }
+    virtual OperatingMode GetOperatingMode() const OVERRIDE { return OperatingMode::RequiresCompleteData; }
     
     /**
      Filters the input data using regular expressions to identify epub:switch
@@ -96,12 +90,24 @@ public:
      matching epub:case statement will be output in place of the entire switch
      compound.
      */
-    virtual void * FilterData(void *data, size_t len, size_t *outputLen);
+    virtual void * FilterData(FilterContext* context, void *data, size_t len, size_t *outputLen) OVERRIDE;
+    
+    ///
+    /// Register this filter with the filter manager
+    static void Register();
+    
+    ///
+    /// Set the list of namespaces for content supported by the renderer.
+    static void SetSupportedNamespaces(const NamespaceList& namespaces) { _supportedNamespaces = namespaces; }
+    static void SetSupportedNamespaces(NamespaceList&& namespaces) { _supportedNamespaces = std::move(namespaces); }
     
 protected:
-    ///
-    /// All the namespaces for content to be allowed through the filter.
-    NamespaceList   _supportedNamespaces;
+    /**
+     All the namespaces for content to be allowed through the filter.
+     
+     The default value includes **no namespaces**.
+     */
+    static NamespaceList    _supportedNamespaces;
     
 private:
     /**

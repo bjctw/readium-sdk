@@ -105,6 +105,9 @@ public:
     bool operator==(_Tp* o) const { return _ref == o; }
     bool operator!=(const RefCounted& o) const { return _ref != o._ref; }
     bool operator!=(_Tp* o) const { return _ref != o; }
+	//bjctw, compatible with clang@linux
+    bool operator<(const RefCounted& o) const { return _ref < o._ref; }
+    bool operator<(_Tp* o) const { return _ref < o; }
     
     _Tp& operator*() { return *_ref; }
     const _Tp& operator*() const { return *_ref; }
